@@ -11,7 +11,7 @@
    Leave any value empty to play offline exactly as before.
    ===================================================================== */
 window.AOC_CONFIG = {
-  SUPABASE_URL: '',              // e.g. 'https://abcdefghijklmno.supabase.co'
-  SUPABASE_PUBLISHABLE_KEY: '',  // e.g. 'sb_publishable_xxxxxxxxxxxxxxxxxxxx'
-  SERVER_URL: '',                // e.g. 'wss://age-of-crowns.onrender.com'
+  SUPABASE_URL: 'https://rgzygnetjomzejffsowj.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_zeVvfvvNE4vXz7QWIqYdxA_mkF7K7th',
+  SERVER_URL: 'wss://age-of-crowns.onrender.com',
 };

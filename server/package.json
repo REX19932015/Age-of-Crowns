@@ -1,0 +1,14 @@
+{
+  "name": "age-of-crowns-server",
+  "version": "1.0.0",
+  "description": "Multiplayer server for Age of Crowns: real-time movement, chat, trading, property, armies and politics. Uses Supabase for accounts and data.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}

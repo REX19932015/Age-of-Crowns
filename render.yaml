@@ -1,0 +1,17 @@
+# One-click setup for Render (https://render.com): New → Blueprint → pick this repository.
+# You will be asked for SUPABASE_URL and SUPABASE_SECRET_KEY.
+services:
+  - type: web
+    name: age-of-crowns-server
+    runtime: node
+    rootDir: server
+    buildCommand: "echo no build step"
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"

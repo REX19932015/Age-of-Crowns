@@ -59,7 +59,7 @@ create table if not exists public.characters (
   items         jsonb not null default '{}'::jsonb,       -- inventory (tools, weapons, tonics…)
   cargo         jsonb not null default '{}'::jsonb,       -- trade goods carried
   army          smallint not null default -1 check (army between -1 and 3),
-  army_rank     smallint not null default 0 check (army_rank between 0 and 8),
+  army_rank     smallint not null default 0 check (army_rank between 0 and 11),
   gov_rank      smallint not null default 0,
   pos_x         double precision not null default 0,
   pos_z         double precision not null default 0,
@@ -150,7 +150,7 @@ create unique index if not exists regiments_name_unique on public.regiments (low
 create table if not exists public.military_members (
   user_id        uuid primary key references public.characters(user_id) on delete cascade,
   army           smallint not null references public.kingdoms(id),
-  rank           smallint not null default 0 check (rank between 0 and 8),
+  rank           smallint not null default 0 check (rank between 0 and 11),
   regiment_id    bigint references public.regiments(id) on delete set null,
   regiment_role  text not null default 'member' check (regiment_role in ('member','officer','commander')),
   joined_at      timestamptz not null default now()

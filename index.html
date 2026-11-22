@@ -1059,7 +1059,7 @@ const _muBase={},_muGeo=new Map();
 function unitOf(o){// soldiers wear a studio unit morph (Regiments, Great War Corps) from js/morphs.js: one seamless uniform + helmet + gear, skinned like the body; regions 1 uniform, 2 facings, 3 breeches take kingdom colours
 const M=window.MORPHS||{};let u=null;
  if(o.corps)u={line:'line',storm:'stormtrooper',ironmask:'ironmask',heavy:'sapper',officer:'officer'}[o.corps]||'line';
- else if(o.musket||o.crossbelt||o.epaulettes)u=(o.hat==='furcap'||o.hat==='shako')?'grenadier':o.hat==='tricorn'?'musketeer':'regiment';
+ else if(o.crossbelt||o.epaulettes)u=(o.hat==='furcap'||o.hat==='shako')?'grenadier':o.hat==='tricorn'?'musketeer':'regiment';
  return u&&M[u]?u:null;}
 function mouseUnitGeo(u,coat,trim,pants){
  const key=u+'|'+coat+'|'+trim+'|'+pants;let g=_muGeo.get(key);if(g)return g;

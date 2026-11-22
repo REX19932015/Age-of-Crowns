@@ -289,3 +289,13 @@ If the code goes up before the SQL, the game still runs, but season progress can
 * **New account can't sign in**: confirm the email (check spam), or turn off email confirmation while testing.
 * **Server log says `403` from the browser**: the site's address isn't in `ALLOWED_ORIGINS`.
 * **Debugging in the browser console**: `AOC_NET.state` shows the connection, other players and chat history. `AOC_NET.say('global','hello')` sends a message.
+
+## Corps, ranks and First World War arms
+
+Run `supabase/corps.sql` once in the SQL Editor (after `schema.sql` and `seasons.sql`). It adds the corps column and moves existing ranks onto the new ladder.
+
+* **Ranks:** Recruit, Private, Lance Corporal, Corporal, Sergeant, Staff Sergeant and **Warrant Officer** are earned with merit. Lieutenant, Captain, Major, Colonel and General are granted only by admins. A Marshal or Monarch can still set ranks up to Warrant Officer.
+* **Corps:** Line Infantry (everyone starts here), Storm Troopers, Ironmask Corps, Heavy Infantry and Officer Corps. Only admins assign corps, from the **⚑ Admin** tab of the Realm panel, where each player row has army, rank and corps pickers (admins can set their own too). The one exception: a Warrant Officer of the line can volunteer for the Storm Troopers at any barracks.
+* **Uniforms** use the kingdom's colours; helmets and armour stay bare metal. Line and Storm Troopers wear a steel helmet (Storm Troopers add stick grenades), the Ironmask Corps a closed helm and light body armour, Heavy Infantry a steel helmet with a brow plate and banded armour, officers a spiked helmet and greatcoat.
+* **Perks:** Storm carbine (Storm Troopers), scoped marksman rifle and 15% armour (Ironmask), anti-tank rifle and 25% armour (Heavy Infantry), automatic pistol (officers).
+* **Firearms** are now First World War style: service carbine, bolt-action rifle, service revolver and pump trench shotgun. There are no machine guns.

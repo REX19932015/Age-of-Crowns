@@ -53,6 +53,20 @@ const KNAMES = W.kingdoms.map(k => k.name);
 const OFFICES = ['monarch', 'chancellor', 'treasurer', 'marshal', 'speaker', 'seat1', 'seat2', 'seat3'];
 const OFFICE_NAMES = { monarch: 'Monarch', chancellor: 'Chancellor', treasurer: 'Treasurer', marshal: 'Marshal', speaker: 'Speaker of Parliament', seat1: 'Member of Parliament', seat2: 'Member of Parliament', seat3: 'Member of Parliament' };
 const RANKS = W.ranks;
+// Ranks up to Warrant Officer are earned in the field; every rank above it is granted by an admin.
+const WARRANT = RANKS.indexOf('Warrant Officer'), MAX_RANK = RANKS.length - 1;
+// Specialised corps. Only admins assign them, except that a line Warrant Officer may volunteer for the Storm Troopers.
+const CORPS = { line: 'Line Infantry', storm: 'Storm Troopers', ironmask: 'Ironmask Corps', heavy: 'Heavy Infantry', officer: 'Officer Corps' };
+const CORPS_HAT = { line: 'stahlhelm', storm: 'stahlhelm', ironmask: 'ironmask', heavy: 'heavyhelm', officer: 'pickelhaube' };
+const CORPS_HATS = new Set(Object.values(CORPS_HAT));
+const corpsOf = S => (S.mil && CORPS[S.mil.corps]) ? S.mil.corps : null;
+// a look may only show corps gear the server has actually granted
+function lockLook(S, look) {
+  const l = { ...(look || {}) }, c = corpsOf(S);
+  if (l.corps !== undefined && l.corps !== c) delete l.corps;
+  if (CORPS_HATS.has(l.hat) && (!c || CORPS_HAT[c] !== l.hat)) delete l.hat;
+  return l;
+}
 const ESTATE_PRICE = 2500, ESTATES_PER_TOWN = 4, REGIMENT_PRICE = 200;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -174,7 +188,7 @@ function cleanBag(o, maxKeys = 200) {
   }
   return out;
 }
-const LOOK_KEYS = ['fur', 'coat', 'trim', 'pants', 'hat', 'hatCol', 'size', 'civvies', 'dress', 'royal', 'epaulettes', 'apron', 'crossbelt', 'cape', 'ruler', 'sash', 'cuirass', 'officer', 'musket', 'gun', 'queen'];
+const LOOK_KEYS = ['fur', 'coat', 'trim', 'pants', 'hat', 'hatCol', 'size', 'civvies', 'dress', 'royal', 'epaulettes', 'apron', 'crossbelt', 'cape', 'ruler', 'sash', 'cuirass', 'officer', 'musket', 'gun', 'queen', 'corps'];
 function cleanLook(o) {
   const out = {};
   if (!o || typeof o !== 'object') return out;
@@ -209,17 +223,21 @@ async function applySave(S, blob, wseq, force) {
     c.items = cleanBag(blob.items); c.cargo = cleanBag(blob.cargo);
   }
   if (fin(blob.x) && fin(blob.z)) { c.pos_x = blob.x; c.pos_z = blob.z; }
-  c.look = cleanLook(blob.look || c.look);
+  c.look = lockLook(S, cleanLook(blob.look || c.look));
   // army: joining and leaving happens in the game; ranks above what an army officer granted climb at most one step every 90 s
   const army = clampInt(blob.army, -1, 3);
   if (army !== (S.mil ? S.mil.army : -1)) await setArmy(S, army);
   if (S.mil) {
-    const want = clampInt(blob.rank, 0, 8);
-    if (want < S.mil.rank) { S.mil.rank = want; q(db.update('military_members', { user_id: S.id }, { rank: want })); }
+    const want = clampInt(blob.rank, 0, MAX_RANK);
+    // the game may only lower a rank, or raise it one step at a time up to Warrant Officer; officer ranks come from admins
+    if (want < S.mil.rank && want < WARRANT && S.mil.rank <= WARRANT) { S.mil.rank = want; q(db.update('military_members', { user_id: S.id }, { rank: want })); }
     else if (want > S.mil.rank) {
-      if (S.admin || now() - (S.mil.lastUp || 0) > 90000) { S.mil.rank++; S.mil.lastUp = now(); q(db.update('military_members', { user_id: S.id }, { rank: S.mil.rank })); }
-      if (S.mil.rank < want) send(S, { t: 'rankSet', rank: S.mil.rank, note: 'Promotions are confirmed by the army one rank at a time.' });
-    }
+      if (S.mil.rank >= WARRANT) send(S, { t: 'rankSet', rank: S.mil.rank, note: 'Ranks above Warrant Officer are granted by the realm’s admins.' });
+      else {
+        if (now() - (S.mil.lastUp || 0) > 90000) { S.mil.rank++; S.mil.lastUp = now(); q(db.update('military_members', { user_id: S.id }, { rank: S.mil.rank })); }
+        if (S.mil.rank < want) send(S, { t: 'rankSet', rank: S.mil.rank, note: S.mil.rank >= WARRANT ? 'Ranks above Warrant Officer are granted by the realm’s admins.' : 'Promotions are confirmed by the army one rank at a time.' });
+      }
+    } else if (want < S.mil.rank) send(S, { t: 'rankSet', rank: S.mil.rank, note: '' });
     c.army = S.mil.army; c.army_rank = S.mil.rank;
   } else { c.army = -1; c.army_rank = 0; }
   c.gov_rank = clampInt(blob.govc && blob.govc.rank, 0, 20);
@@ -250,15 +268,15 @@ async function setArmy(S, army) {
     return;
   }
   if (S.mil) await leaveRegiment(S, true);
-  S.mil = { army, rank: 0, regiment_id: null, role: 'member', lastUp: now() };
-  await q(db.insert('military_members', { user_id: S.id, army, rank: 0, regiment_id: null, regiment_role: 'member' }, { upsert: true, onConflict: 'user_id', returning: false }));
+  S.mil = { army, rank: 0, regiment_id: null, role: 'member', corps: 'line', lastUp: now() };
+  await q(db.insert('military_members', { user_id: S.id, army, rank: 0, regiment_id: null, regiment_role: 'member', corps: 'line' }, { upsert: true, onConflict: 'user_id', returning: false }));
   send(S, { t: 'mil', mil: milInfo(S) });
   announcePlayer(S);
 }
 function milInfo(S) {
   if (!S.mil) return null;
   const r = S.mil.regiment_id ? regiments.get(S.mil.regiment_id) : null;
-  return { army: S.mil.army, rank: S.mil.rank, rankName: RANKS[S.mil.rank], regiment: r ? { id: r.id, name: r.name, commander: nameOf(r.commander) } : null, role: S.mil.role };
+  return { army: S.mil.army, rank: S.mil.rank, rankName: RANKS[S.mil.rank], corps: corpsOf(S) || 'line', corpsName: CORPS[corpsOf(S) || 'line'], warrant: WARRANT, regiment: r ? { id: r.id, name: r.name, commander: nameOf(r.commander) } : null, role: S.mil.role };
 }
 async function leaveRegiment(S, quiet) {
   if (!S.mil || !S.mil.regiment_id) return;
@@ -376,14 +394,14 @@ async function endEvent(E) {
 
 // ---------------------------------------------------------------- sessions and world entry
 function publicInfo(S) {
-  return { nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), look: S.vlook || S.char.look, cos: SEA ? SEA.cosPublic(S) : {}, army: S.mil ? S.mil.army : -1, x: S.x, y: S.y, z: S.z, yaw: S.yaw, mode: S.mode, in: S.inside };
+  return { nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), look: lockLook(S, S.vlook || S.char.look), cos: SEA ? SEA.cosPublic(S) : {}, army: S.mil ? S.mil.army : -1, x: S.x, y: S.y, z: S.z, yaw: S.yaw, mode: S.mode, in: S.inside };
 }
 function announcePlayer(S) { const info = publicInfo(S); for (const O of online.values()) if (O.ready && O.seen.has(S.nid)) send(O, { t: 'pu', p: info }); }
 async function enterWorld(S) {
   const c = S.char;
   names.set(S.id, c.name);
   const m = await db.one('military_members', { where: { user_id: S.id } }).catch(() => null);
-  S.mil = m ? { army: m.army, rank: m.rank, regiment_id: m.regiment_id && +m.regiment_id, role: m.regiment_role, lastUp: now() } : null;
+  S.mil = m ? { army: m.army, rank: m.rank, regiment_id: m.regiment_id && +m.regiment_id, role: m.regiment_role, corps: CORPS[m.corps] ? m.corps : 'line', lastUp: now() } : null;
   S.x = NaN; S.z = NaN; S.y = 0;   // invisible to others until the game reports where they really are
   S.ready = true;
   online.set(S.id, S);
@@ -587,7 +605,7 @@ const H = {
     S.moved = true;
     if (SEA && !S.admin) SEA.onMove(S, ox, oz);
   },
-  look(S, m) { S.vlook = cleanLook(m.look); announcePlayer(S); },
+  look(S, m) { S.vlook = lockLook(S, cleanLook(m.look)); announcePlayer(S); },
   save(S, m) { const t = now(); if (!m.force && t - S.lastSave < 3000) return; S.lastSave = t; return applySave(S, m.save, m.wseq, !!m.force); },
   chat: onChat,
   emote(S, m) { const e = (SEA ? SEA.emoteAllowed(S, m.e) : (['wave', 'bow', 'cheer', 'salute', 'dance', 'laugh'].includes(m.e) ? m.e : null)) || 'wave'; if (now() - S.lastEmote < 1500) return; S.lastEmote = now(); if (SEA && S.seen.size) SEA.metric(S, 'emotes', 1); for (const O of online.values()) if (O.seen.has(S.nid) || O === S) send(O, { t: 'emote', nid: S.nid, name: S.char.name, e }); },
@@ -681,7 +699,7 @@ const H = {
   async regCreate(S, m) {
     if (!S.mil) return err(S, 'Enlist in an army first.');
     if (S.mil.regiment_id) return err(S, 'Leave your regiment first.');
-    if (S.mil.rank < 3) return err(S, 'Only a Sergeant or higher may raise a regiment.');
+    if (S.mil.rank < RANKS.indexOf('Sergeant')) return err(S, 'Only a Sergeant or higher may raise a regiment.');
     const name = str(m.name, 40); if (name.length < 3) return err(S, 'Give the regiment a name (3–40 letters).');
     if (S.char.gold < REGIMENT_PRICE) return err(S, `Raising a regiment costs ${REGIMENT_PRICE} gold.`);
     let r; try { r = (await db.insert('regiments', { kingdom: S.mil.army, name, commander: S.id }))[0]; } catch (e) { return err(S, 'That regiment name is taken.'); }
@@ -725,7 +743,7 @@ const H = {
     const O = byNid.get(m.nid); if (!O || !O.ready || !O.mil) return err(S, 'They are not a soldier.');
     const k = O.mil.army; const isMon = offices[k].monarch === S.id, isMar = offices[k].marshal === S.id;
     if (!isMon && !isMar && !S.admin) return err(S, `Only the Marshal or Monarch of ${KNAMES[k]} can promote its soldiers.`);
-    const r = clampInt(m.rank, 0, isMon || S.admin ? 8 : 7);
+    const r = clampInt(m.rank, 0, S.admin ? MAX_RANK : WARRANT);   // field promotions stop at Warrant Officer; officers are made by admins
     O.mil.rank = r; O.mil.lastUp = now(); await q(db.update('military_members', { user_id: O.id }, { rank: r }));
     O.char.army_rank = r; O.dirty = true;
     send(O, { t: 'rankSet', rank: r, by: S.char.name }); announcePlayer(O);
@@ -810,18 +828,63 @@ const H = {
     const p = polState(k); p.myVotes = myVotes(S, k);
     send(S, { t: 'kingdom', k, pol: p }); announcePlayer(S); toast(S, `You are now a citizen of ${KNAMES[k]}.`, 'gold');
   },
+  // ---- specialised corps
+  async joinStorm(S) {   // the one corps a soldier can volunteer for: line Warrant Officers may join the Storm Troopers
+    if (!S.mil) return err(S, 'Enlist in an army first.');
+    if (corpsOf(S) !== 'line') return err(S, `You already serve in the ${CORPS[corpsOf(S)]}. Only an admin can transfer you.`);
+    if (S.mil.rank !== WARRANT) return err(S, `Only a Warrant Officer of the line may volunteer for the Storm Troopers.`);
+    S.mil.corps = 'storm'; await q(db.update('military_members', { user_id: S.id }, { corps: 'storm' }));
+    S.vlook = lockLook(S, S.vlook); send(S, { t: 'mil', mil: milInfo(S) }); announcePlayer(S);
+    toast(S, 'You volunteer for the Storm Troopers. Grenades, a storm carbine and the steel helmet are yours.', 'gold');
+  },
+  async adminSetMil(S, m) {   // admins choose anyone's army, rank and corps, their own included
+    if (!S.admin) return err(S, 'Only admins can assign ranks and corps.');
+    const corps = m.corps === undefined ? undefined : (CORPS[m.corps] ? m.corps : null);
+    if (corps === null) return err(S, 'No such corps.');
+    let T = null, uid = null;
+    if (fin(m.nid)) { T = [...online.values()].find(O => O.nid === m.nid && O.char); if (!T) return err(S, 'That player is not online any more. Refresh the list.'); uid = T.id; }
+    else if (typeof m.uid === 'string' && /^[0-9a-f-]{36}$/i.test(m.uid)) uid = m.uid;
+    else return err(S, 'Pick a player.');
+    if (!T) T = online.get(uid) || null;
+    const ch = T ? T.char : await db.one('characters', { columns: 'user_id,name,kingdom', where: { user_id: uid } }).catch(() => null);
+    if (!ch) return err(S, 'No such character.');
+    const cur = T ? T.mil : await db.one('military_members', { where: { user_id: uid } }).catch(() => null);
+    let army = m.army === undefined ? (cur ? cur.army : -1) : clampInt(m.army, -1, 3);
+    if (army < 0 && (corps !== undefined || m.rank !== undefined) && m.army === undefined) army = ch.kingdom;   // giving a rank or corps to a civilian enlists them in their own kingdom
+    if (army < 0) {
+      if (T) await setArmy(T, -1); else { await q(db.remove('military_members', { user_id: uid })); await q(db.update('characters', { user_id: uid }, { army: -1, army_rank: 0 })); }
+      toast(S, `${ch.name} is no longer a soldier.`); if (T) toast(T, 'An admin has discharged you from the army.');
+      return H.adminList(S, { force: true });
+    }
+    const rank = m.rank === undefined ? (cur && cur.army === army ? cur.rank : 0) : clampInt(m.rank, 0, MAX_RANK);
+    const cps = corps !== undefined ? corps : (cur && cur.army === army ? (cur.corps || 'line') : 'line');
+    if (T) {
+      if (!T.mil || T.mil.army !== army) await setArmy(T, army);
+      T.mil.rank = rank; T.mil.corps = cps; T.mil.lastUp = now(); T.char.army = army; T.char.army_rank = rank; T.dirty = true;
+      await q(db.update('military_members', { user_id: uid }, { rank, corps: cps }));
+      T.vlook = lockLook(T, T.vlook);
+      send(T, { t: 'mil', mil: milInfo(T) }); send(T, { t: 'rankSet', rank, by: S.char.name, army, corps: cps }); announcePlayer(T);
+      if (T !== S) toast(T, `${S.char.name} makes you ${RANKS[rank]} of the ${CORPS[cps]}, ${KNAMES[army]} Army.`, 'gold');
+    } else {
+      await q(db.insert('military_members', { user_id: uid, army, rank, corps: cps, regiment_id: cur && cur.army === army ? cur.regiment_id : null, regiment_role: cur && cur.army === army ? cur.regiment_role : 'member' }, { upsert: true, onConflict: 'user_id', returning: false }));
+      await q(db.update('characters', { user_id: uid }, { army, army_rank: rank }));
+    }
+    toast(S, `${ch.name} is now ${RANKS[rank]}, ${CORPS[cps]}, ${KNAMES[army]} Army.`, 'gold');
+    return H.adminList(S, { force: true });
+  },
   // ---- admin tools: the whole realm's player list (server admins only, checked here)
-  async adminList(S) {
+  async adminList(S, m) {
     if (!S.admin) return err(S, 'Only admins can see the realm’s player list.');
-    if (now() - (S.lastAdminList || 0) < 1500) return; S.lastAdminList = now();
+    if (!(m && m.force) && now() - (S.lastAdminList || 0) < 1500) return; S.lastAdminList = now();
+    const mm = new Map((await db.select('military_members', { columns: 'user_id,corps', limit: 2000 }).catch(() => [])).map(r => [r.user_id, r.corps]));
     const rows = await db.select('characters', { columns: 'user_id,name,kingdom,gold,army,army_rank,pos_x,pos_z,last_seen,created_at', order: 'last_seen.desc', limit: 500 }).catch(() => []);
     const seen = new Set(), list = [];
     for (const O of online.values()) {
       if (!O.char) continue; seen.add(O.id);
-      list.push({ nid: O.nid, name: O.char.name, k: O.char.kingdom, gold: O.char.gold, army: O.mil ? O.mil.army : -1, rank: O.mil ? O.mil.rank : 0, x: fin(O.x) ? Math.round(O.x) : null, z: fin(O.z) ? Math.round(O.z) : null, inside: !!O.inside, mode: O.mode || 'walk', online: true, playing: !!O.ready && fin(O.x), last: now(), since: O.char.created_at, muted: O.chat && O.chat.muteUntil > now() ? O.chat.muteUntil : 0 });
+      list.push({ nid: O.nid, name: O.char.name, k: O.char.kingdom, gold: O.char.gold, army: O.mil ? O.mil.army : -1, rank: O.mil ? O.mil.rank : 0, corps: corpsOf(O) || 'line', x: fin(O.x) ? Math.round(O.x) : null, z: fin(O.z) ? Math.round(O.z) : null, inside: !!O.inside, mode: O.mode || 'walk', online: true, playing: !!O.ready && fin(O.x), last: now(), since: O.char.created_at, muted: O.chat && O.chat.muteUntil > now() ? O.chat.muteUntil : 0 });
     }
-    for (const r of rows) if (!seen.has(r.user_id)) list.push({ name: r.name, k: r.kingdom, gold: +r.gold, army: r.army, rank: r.army_rank, x: Math.round(+r.pos_x || 0), z: Math.round(+r.pos_z || 0), online: false, last: Date.parse(r.last_seen) || 0, since: r.created_at });
-    send(S, { t: 'adminList', list, total: list.length, capped: rows.length >= 500 });
+    for (const r of rows) if (!seen.has(r.user_id)) list.push({ uid: r.user_id, name: r.name, k: r.kingdom, gold: +r.gold, army: r.army, rank: r.army_rank, corps: mm.get(r.user_id) || 'line', x: Math.round(+r.pos_x || 0), z: Math.round(+r.pos_z || 0), online: false, last: Date.parse(r.last_seen) || 0, since: r.created_at });
+    send(S, { t: 'adminList', list, total: list.length, capped: rows.length >= 500, ranks: RANKS, corps: CORPS, warrant: WARRANT });
   },
   adminSummon(S, m) {
     if (!S.admin) return err(S, 'Only admins can summon players.');

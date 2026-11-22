@@ -1060,6 +1060,7 @@ function unitOf(o){// soldiers wear a studio unit morph (Regiments, Great War Co
 const M=window.MORPHS||{};let u=null;
  if(o.corps)u={line:'line',storm:'stormtrooper',ironmask:'ironmask',heavy:'sapper',officer:'officer'}[o.corps]||'line';
  else if(o.crossbelt||o.epaulettes)u=(o.hat==='furcap'||o.hat==='shako')?'grenadier':o.hat==='tricorn'?'musketeer':'regiment';
+ else if(o.coat)u=(o.apron||o.hat==='cap'||o.hat==='bandana'||o.hat==='wide')?'civtunic':'civcoat';   // everyone else wears everyday clothes: a work tunic or a town coat
  return u&&M[u]?u:null;}
 function mouseUnitGeo(u,coat,trim,pants){
  const key=u+'|'+coat+'|'+trim+'|'+pants;let g=_muGeo.get(key);if(g)return g;
@@ -1119,7 +1120,7 @@ function corpsBody(v,c,coat){const lea='#4a3222',leaD='#2e1e14',gm='#3b3c38';
  if(c==='officer'){v.add(GB.tcyl,coat,TM(0,.3,0,.45,.55,.41),shadeHex(coat,.7));v.add(GB.boxc,leaD,TM(0,1.1,.33,.06,.82,.025,0,0,.6));v.add(GB.boxc,leaD,TM(-.43,.72,.12,.08,.22,.15,.25,0,0));v.add(GB.sphs,'#b8913e',TM(-.47,.8,.16,.02));}}
 function makeMouse(o){
  const fur=o.fur,furL=mixHex(fur,'#f3e6d4',.5),furD=shadeHex(fur,.72),skin='#e3a3a7',skinD='#c4868b',coat=o.coat,trim=o.trim||'#e8e0cc',pants=o.pants||'#5a4a3a';
- const g=new THREE.Group(),body=new THREE.Bone();g.add(body);const U=unitOf(o),UH=U&&U!=='regiment';   // UH: the unit morph brings its own helmet
+ const g=new THREE.Group(),body=new THREE.Bone();g.add(body);const U=unitOf(o),UH=U&&U!=='regiment'&&U!=='civcoat'&&U!=='civtunic';   // UH: the unit morph brings its own helmet
  const kB=['B3',U,fur,coat,trim,pants,o.apron,o.epaulettes,o.crossbelt,o.cape,o.ruler,o.sash,o.cuirass,o.corps].join('|');
  body.add(pm(partGeo(kB,v=>{
   // soldiers wear a studio unit morph (mouseUnitGeo); only accessories are built here

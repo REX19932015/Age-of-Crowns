@@ -57,6 +57,7 @@ const ESTATE_PRICE = 2500, ESTATES_PER_TOWN = 4, REGIMENT_PRICE = 200;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const now = () => Date.now();
+let SEA = null;   // seasons, battle pass and story (server/season.js); set up after the helpers below
 const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(Number(v) || 0)));
 const str = (v, max) => (typeof v === 'string' ? v : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
 const fin = v => typeof v === 'number' && Number.isFinite(v);
@@ -77,6 +78,7 @@ const events = new Map();      // id -> live event
 const history = new Map();     // channel -> recent messages
 const tradeAsks = new Map();   // targetUid -> {from, until}
 const regInvites = new Map();  // targetUid -> {regiment, from, until}
+const leaving = new Map();     // userId -> promise of their last session finishing its save
 
 const send = (S, msg) => { if (S && S.ws.open) S.ws.send(JSON.stringify(msg)); };
 const err = (S, msg) => send(S, { t: 'err', msg });
@@ -86,6 +88,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const nameOf = uid => names.get(uid) || 'someone';
 const officesOf = uid => { const o = []; offices.forEach((m, k) => { for (const [off, h] of Object.entries(m)) if (h === uid) o.push({ k, office: off }); }); return o; };
 function titleOf(S) {
+  const st = SEA && SEA.title(S); if (st) return st;
   const o = officesOf(S.id);
   const mon = o.find(x => x.office === 'monarch');
   if (mon) return (S.char.look && S.char.look.queen ? 'Queen' : 'Monarch') + ' of ' + KNAMES[mon.k];
@@ -200,6 +203,7 @@ async function applySave(S, blob, wseq, force) {
       const want = g - c.gold, inc = Math.floor(Math.min(want, allowed));
       if (!S.admin) S.earn.budget -= inc;
       c.gold += inc;
+      if (SEA && inc > 0) SEA.metric(S, 'gold', inc);
       if (inc < want) { resync = true; c.wallet_seq++; }
     }
     c.items = cleanBag(blob.items); c.cargo = cleanBag(blob.cargo);
@@ -340,27 +344,30 @@ const EVENT_KINDS = [
   { kind: 'muster', reward: 60, title: t => `Royal muster at ${t.name}` },
 ];
 async function startEvent(kind) {
+  let ext = null;
+  if (SEA && !EVENT_KINDS.some(e => e.kind === kind)) ext = SEA.nextLiveEvent();
   const K0 = EVENT_KINDS.find(e => e.kind === kind) || EVENT_KINDS[Math.floor(Math.random() * EVENT_KINDS.length)];
   const pool = TOWNS.filter(t => t.type !== 'village' || Math.random() < .3);
-  const t = pool[Math.floor(Math.random() * pool.length)];
+  const t = ext ? TOWNS[ext.town] : pool[Math.floor(Math.random() * pool.length)];
   const ends = now() + CFG.EVENT_LEN_MIN * 60000;
-  const row = { kind: K0.kind, title: K0.title(t), town: t.i, x: t.x, z: t.z, reward: K0.reward, ends_at: new Date(ends).toISOString() };
+  const row = ext ? { kind: ext.kind, title: ext.title, town: t.i, x: t.x, z: t.z, reward: ext.reward, ends_at: new Date(ends).toISOString() } : { kind: K0.kind, title: K0.title(t), town: t.i, x: t.x, z: t.z, reward: K0.reward, ends_at: new Date(ends).toISOString() };
   let id = -now();
   try { const r = await db.insert('world_events', row); id = +r[0].id; } catch (e) { log('event insert failed', e.message); }
-  const E = { id, ...row, ends, joined: new Set(), time: new Map() };
+  const E = { id, ...row, ...(ext ? { obj: ext.obj, cps: ext.cps || null, xp: ext.xp, holdSecs: ext.holdSecs } : {}), ends, joined: new Set(), time: new Map() };
   events.set(id, E);
   each(S => send(S, { t: 'event', ev: evInfo(E) }));
   system('global', `${E.title}. Go there and press “Join” in the Realm panel (.) for ${E.reward} gold.`);
   return E;
 }
-function evInfo(E) { return { id: E.id, kind: E.kind, title: E.title, x: E.x, z: E.z, reward: E.reward, ends: E.ends, count: E.joined.size }; }
+function evInfo(E) { return { id: E.id, kind: E.kind, title: E.title, x: E.x, z: E.z, reward: E.reward, ends: E.ends, count: E.joined.size, ...(SEA ? SEA.eventExtra(E) : {}) }; }
 async function endEvent(E) {
   events.delete(E.id);
-  const winners = [...E.joined].filter(uid => (E.time.get(uid) || 0) >= CFG.EVENT_STAY_S);
+  const winners = [...E.joined].filter(uid => SEA ? SEA.eventWon(E, uid) : (E.time.get(uid) || 0) >= CFG.EVENT_STAY_S);
   for (const uid of winners) {
     await changeGold(uid, E.reward, 'world event', 'event:' + E.id);
     if (E.id > 0) q(db.update('event_participants', { event_id: E.id, user_id: uid }, { rewarded: true }));
-    const S = online.get(uid); if (S) toast(S, `${E.title} is over: you earned ${E.reward} gold.`, 'gold');
+    if (SEA) SEA.eventRewarded(uid, E);
+    const S = online.get(uid); if (S) toast(S, `${E.title} is over: you earned ${E.reward} gold${E.xp ? ' and ' + E.xp + ' XP' : ''}.`, 'gold');
   }
   if (E.id > 0) q(db.update('world_events', { id: E.id }, { status: 'done' }));
   system('global', `${E.title} has ended. ${winners.length} player${winners.length === 1 ? '' : 's'} took part.`);
@@ -369,7 +376,7 @@ async function endEvent(E) {
 
 // ---------------------------------------------------------------- sessions and world entry
 function publicInfo(S) {
-  return { nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), look: S.vlook || S.char.look, army: S.mil ? S.mil.army : -1, x: S.x, y: S.y, z: S.z, yaw: S.yaw, mode: S.mode, in: S.inside };
+  return { nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), look: S.vlook || S.char.look, cos: SEA ? SEA.cosPublic(S) : {}, army: S.mil ? S.mil.army : -1, x: S.x, y: S.y, z: S.z, yaw: S.yaw, mode: S.mode, in: S.inside };
 }
 function announcePlayer(S) { const info = publicInfo(S); for (const O of online.values()) if (O.ready && O.seen.has(S.nid)) send(O, { t: 'pu', p: info }); }
 async function enterWorld(S) {
@@ -395,6 +402,7 @@ async function enterWorld(S) {
     regiments: [...regiments.values()].filter(r => r.kingdom === (S.mil ? S.mil.army : c.kingdom)).map(r => ({ id: r.id, name: r.name, commander: nameOf(r.commander) })),
   });
   sendOffices(S);
+  if (SEA) await SEA.onEnter(S);
   log(`${c.name} entered the world (${online.size} online)`);
 }
 async function leaveWorld(S) {
@@ -404,6 +412,7 @@ async function leaveWorld(S) {
   byNid.delete(S.nid);
   if (S.trade) cancelTrade(S.trade, `${S.char.name} left.`);
   for (const O of online.values()) if (O.seen.delete(S.nid)) send(O, { t: 'pl', nid: S.nid });
+  if (SEA) await SEA.onLeave(S);
   S.dirty = true; await flush(S);
   log(`${S.char.name} left (${online.size} online)`);
 }
@@ -428,12 +437,13 @@ function tickMovement() {
   for (const S of online.values()) S.moved = false;
 }
 function tickRoster() {
-  const list = [...online.values()].filter(S => S.ready).map(S => ({ nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), x: Math.round(S.x || 0), z: Math.round(S.z || 0), army: S.mil ? S.mil.army : -1 }));
+  const list = [...online.values()].filter(S => S.ready).map(S => ({ nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), x: fin(S.x) ? Math.round(S.x) : null, z: fin(S.z) ? Math.round(S.z) : null, army: S.mil ? S.mil.army : -1 }));
   each(S => send(S, { t: 'roster', list }));
 }
 function tickEvents(dt) {
   for (const E of events.values()) {
     for (const uid of E.joined) { const S = online.get(uid); if (S && S.ready && !S.inside && Math.hypot(S.x - E.x, S.z - E.z) < 160) E.time.set(uid, (E.time.get(uid) || 0) + dt); }
+    if (SEA) SEA.eventTick(E, dt);
     if (now() > E.ends) endEvent(E);
   }
 }
@@ -498,16 +508,24 @@ async function command(S, body) {
   const [cmd, ...rest] = body.slice(1).split(' ');
   const arg = rest.join(' ').trim();
   const c = cmd.toLowerCase();
-  if (c === 'w' || c === 'pm' || c === 'msg') { const sp = arg.indexOf(' '); if (sp < 1) return err(S, 'Use: /w Name message'); if (!chatAllowed(S, arg)) return; return privateMessage(S, arg.slice(0, sp), arg.slice(sp + 1).trim()); }
+  if (c === 'w' || c === 'pm' || c === 'msg') {
+    // names can contain spaces ("Pip Cheddarby"): prefer the longest name of someone online that the text starts with
+    const low = arg.toLowerCase();
+    let nmLen = 0; for (const O of online.values()) { const n = O.char && O.char.name; if (n && n.length > nmLen && low.startsWith(n.toLowerCase() + ' ')) nmLen = n.length; }
+    const sp = nmLen || arg.indexOf(' '); if (sp < 1) return err(S, 'Use: /w Name message');
+    if (!chatAllowed(S, arg)) return; return privateMessage(S, arg.slice(0, sp), arg.slice(sp + 1).trim());
+  }
   if (c === 'g' || c === 'l' || c === 'k' || c === 'a') return onChat(S, { ch: { g: 'global', l: 'local', k: 'kingdom', a: 'army' }[c], body: arg });
   if (c === 'online') return toast(S, `${online.size} player${online.size === 1 ? '' : 's'} online.`);
   if (!S.admin) return err(S, 'Unknown command. Try /w Name message, /g, /l, /k, /a, /online.');
   if (c === 'announce') return system('global', '📜 ' + arg);
-  if (c === 'event') { await startEvent(arg || null); return; }
+  if (c === 'event') { await startEvent(arg || 'season'); return; }
+  if (c === 'finale') { if (!SEA.startFinale(S)) return err(S, 'No finale this season, or one is already running.'); return; }
+  if (c === 'givexp') { const n = clampInt(arg, 1, 200000); SEA.addXPAdmin(S, n); return toast(S, `+${n} XP (admin test).`); }
   const T = [...online.values()].find(O => O.char && O.char.name.toLowerCase() === arg.split(' ')[0].toLowerCase());
   if (c === 'kick') { if (!T) return err(S, 'Not online.'); send(T, { t: 'kicked', msg: 'You were removed from the server by an admin.' }); T.ws.close(4001, 'kicked'); return toast(S, `${T.char.name} was kicked.`); }
   if (c === 'mute') { if (!T) return err(S, 'Not online.'); const mins = clampInt(arg.split(' ')[1] || 5, 1, 1440); T.chat.muteUntil = now() + mins * 60000; toast(T, `An admin muted you for ${mins} minutes.`); return toast(S, `${T.char.name} muted for ${mins} minutes.`); }
-  return err(S, 'Admin commands: /announce text, /event [fair|tourney|raid|muster], /kick Name, /mute Name minutes');
+  return err(S, 'Admin commands: /announce text, /event [fair|tourney|raid|muster], /finale, /givexp amount, /kick Name, /mute Name minutes');
 }
 
 // ---------------------------------------------------------------- trading between players
@@ -551,24 +569,28 @@ async function executeTrade(T) {
   if (T.offer.a.gold) q(db.insert('ledger', [{ user_id: T.A.id, delta: -T.offer.a.gold, reason: 'trade', ref: B.name }, { user_id: T.B.id, delta: T.offer.a.gold - taxA, reason: 'trade', ref: A.name }], { returning: false }));
   if (T.offer.b.gold) q(db.insert('ledger', [{ user_id: T.B.id, delta: -T.offer.b.gold, reason: 'trade', ref: A.name }, { user_id: T.A.id, delta: T.offer.b.gold - taxB, reason: 'trade', ref: B.name }], { returning: false }));
   for (const S of [T.A, T.B]) { S.trade = null; send(S, walletMsg(S.char)); send(S, { t: 'tradeEnd', id: T.id, done: true, msg: 'The trade is done. Shake paws!' }); }
+  const worth = o => o.gold + Object.values(o.items).reduce((a, b) => a + b, 0) + Object.values(o.cargo).reduce((a, b) => a + b, 0);
+  if (SEA && worth(T.offer.a) > 0 && worth(T.offer.b) > 0) { SEA.metric(T.A, 'trades', 1); SEA.metric(T.B, 'trades', 1); }
 }
 
 // ---------------------------------------------------------------- message handlers
 const near = (S, O, d) => O && O.ready && S.inside === O.inside && Math.hypot(S.x - O.x, S.z - O.z) <= d;
 const H = {
   async s(S, m) {   // movement
-    const t = now(); if (t - S.lastMove < 40) return; S.lastMove = t;
+    S.lastMove = now();   // the newest position always wins; the flood guard limits how often this can run
     if (![m.x, m.y, m.z, m.yaw].every(fin) || Math.abs(m.x) > 40000 || Math.abs(m.z) > 40000 || Math.abs(m.y) > 5000) return;
+    const ox = S.x, oz = S.z;
     S.x = m.x; S.y = m.y; S.z = m.z; S.yaw = m.yaw; S.spd = fin(m.spd) ? Math.max(0, Math.min(400, m.spd)) : 0;
     S.mode = ['walk', 'ship', 'balloon', 'cannon', 'travel', 'swim', 'ride', 'fly', 'dead'].includes(m.mode) ? m.mode : 'walk';
     const ins = m.in === null || m.in === undefined ? null : str(String(m.in), 40);
     if (ins !== S.inside) { S.inside = ins; }
     S.moved = true;
+    if (SEA && !S.admin) SEA.onMove(S, ox, oz);
   },
   look(S, m) { S.vlook = cleanLook(m.look); announcePlayer(S); },
   save(S, m) { const t = now(); if (!m.force && t - S.lastSave < 3000) return; S.lastSave = t; return applySave(S, m.save, m.wseq, !!m.force); },
   chat: onChat,
-  emote(S, m) { const e = ['wave', 'bow', 'cheer', 'salute', 'dance', 'laugh'].includes(m.e) ? m.e : 'wave'; if (now() - S.lastEmote < 1500) return; S.lastEmote = now(); for (const O of online.values()) if (O.seen.has(S.nid) || O === S) send(O, { t: 'emote', nid: S.nid, name: S.char.name, e }); },
+  emote(S, m) { const e = (SEA ? SEA.emoteAllowed(S, m.e) : (['wave', 'bow', 'cheer', 'salute', 'dance', 'laugh'].includes(m.e) ? m.e : null)) || 'wave'; if (now() - S.lastEmote < 1500) return; S.lastEmote = now(); if (SEA && S.seen.size) SEA.metric(S, 'emotes', 1); for (const O of online.values()) if (O.seen.has(S.nid) || O === S) send(O, { t: 'emote', nid: S.nid, name: S.char.name, e }); },
   async inspect(S, m) {
     const O = byNid.get(m.nid); if (!O || !O.ready) return err(S, 'That player is gone.');
     const props = [...properties.values()].filter(p => p.owner === O.id).length;
@@ -582,6 +604,7 @@ const H = {
     if (!(await changeGold(S.id, -amt, 'gift', O.char.name))) return err(S, 'You do not have that much gold.');
     await changeGold(O.id, amt, 'gift', S.char.name);
     toast(S, `You give ${amt} gold to ${O.char.name}.`); toast(O, `${S.char.name} gives you ${amt} gold.`, 'gold');
+    if (SEA && amt >= 25) SEA.metric(S, 'gifts', 1);
   },
   tradeReq(S, m) {
     const O = byNid.get(m.nid);
@@ -734,6 +757,7 @@ const H = {
     const cand = [...E.cands.keys()].find(id => id === m.cand); if (!cand) return err(S, 'That person is not standing.');
     try { await db.insert('election_votes', { election_id: E.id, voter_id: S.id, candidate_id: cand }, { returning: false }); } catch (e) { return err(S, 'You have already voted in this election.'); }
     E.voters.add(S.id); E.cands.set(cand, E.cands.get(cand) + 1); pushPol(E.kingdom); toast(S, `Your vote for ${nameOf(cand)} is counted.`);
+    if (SEA) SEA.metric(S, 'votes', 1);
   },
   async appoint(S, m) {
     const k = S.char.kingdom;
@@ -772,6 +796,7 @@ const H = {
     if (M.yes.has(S.id) || M.no.has(S.id)) return err(S, 'You have already voted on this motion.');
     try { await db.insert('motion_votes', { motion_id: M.id, voter_id: S.id, yes: !!m.yes }, { returning: false }); } catch (e) { return err(S, 'You have already voted.'); }
     (m.yes ? M.yes : M.no).add(S.id);
+    if (SEA) SEA.metric(S, 'votes', 1);
     const members = new Set(Object.values(offices[M.kingdom]).filter(Boolean));
     if ([...members].every(id => M.yes.has(id) || M.no.has(id)) && members.size) await closeMotion(M); else pushPol(M.kingdom);
   },
@@ -784,6 +809,28 @@ const H = {
     await q(db.update('characters', { user_id: S.id }, { kingdom: k, kingdom_changed_at: S.char.kingdom_changed_at }));
     const p = polState(k); p.myVotes = myVotes(S, k);
     send(S, { t: 'kingdom', k, pol: p }); announcePlayer(S); toast(S, `You are now a citizen of ${KNAMES[k]}.`, 'gold');
+  },
+  // ---- admin tools: the whole realm's player list (server admins only, checked here)
+  async adminList(S) {
+    if (!S.admin) return err(S, 'Only admins can see the realm’s player list.');
+    if (now() - (S.lastAdminList || 0) < 1500) return; S.lastAdminList = now();
+    const rows = await db.select('characters', { columns: 'user_id,name,kingdom,gold,army,army_rank,pos_x,pos_z,last_seen,created_at', order: 'last_seen.desc', limit: 500 }).catch(() => []);
+    const seen = new Set(), list = [];
+    for (const O of online.values()) {
+      if (!O.char) continue; seen.add(O.id);
+      list.push({ nid: O.nid, name: O.char.name, k: O.char.kingdom, gold: O.char.gold, army: O.mil ? O.mil.army : -1, rank: O.mil ? O.mil.rank : 0, x: fin(O.x) ? Math.round(O.x) : null, z: fin(O.z) ? Math.round(O.z) : null, inside: !!O.inside, mode: O.mode || 'walk', online: true, playing: !!O.ready && fin(O.x), last: now(), since: O.char.created_at, muted: O.chat && O.chat.muteUntil > now() ? O.chat.muteUntil : 0 });
+    }
+    for (const r of rows) if (!seen.has(r.user_id)) list.push({ name: r.name, k: r.kingdom, gold: +r.gold, army: r.army, rank: r.army_rank, x: Math.round(+r.pos_x || 0), z: Math.round(+r.pos_z || 0), online: false, last: Date.parse(r.last_seen) || 0, since: r.created_at });
+    send(S, { t: 'adminList', list, total: list.length, capped: rows.length >= 500 });
+  },
+  adminSummon(S, m) {
+    if (!S.admin) return err(S, 'Only admins can summon players.');
+    const T = [...online.values()].find(O => O.nid === m.nid && O.ready);
+    if (!T) return err(S, 'That player is not in the world right now.');
+    if (T === S) return;
+    if (!fin(S.x) || S.inside) return err(S, 'Step outside first, so there is somewhere to bring them.');
+    send(T, { t: 'summon', x: S.x + 2, z: S.z + 2, by: S.char.name });
+    toast(S, `${T.char.name} is brought to you.`);
   },
   eventJoin(S, m) {
     const E = events.get(Number(m.id)); if (!E) return err(S, 'That event is over.');
@@ -800,6 +847,7 @@ const H = {
 // ---------------------------------------------------------------- connection lifecycle
 async function onHello(S, m) {
   const user = await db.userFromToken(m.token);
+  if (user && leaving.has(user.id)) await leaving.get(user.id).catch(() => {});   // let a just-closed session finish saving first
   if (!user) { send(S, { t: 'auth', ok: false, msg: 'Your login has expired. Please sign in again.' }); return S.ws.close(4003, 'bad token'); }
   let prof = await db.one('profiles', { where: { id: user.id } });
   if (!prof) { await db.insert('profiles', { id: user.id }, { upsert: true, onConflict: 'id', returning: false }); prof = { id: user.id, is_admin: false, banned: false }; }
@@ -858,8 +906,18 @@ attach(server, { maxPayload: 600 * 1024, verifyOrigin: originOk }, (ws, req) => 
       } catch (e) { log('handler error', m.t, e.stack || e.message); err(S, 'The server could not do that.'); }
     });
   });
-  ws.on('close', () => { busy.then(() => leaveWorld(S)).catch(() => {}); byNid.delete(S.nid); });
+  ws.on('close', () => {
+    const p = busy.then(() => leaveWorld(S)).catch(() => {});
+    if (S.id) { leaving.set(S.id, p); p.then(() => { if (leaving.get(S.id) === p) leaving.delete(S.id); }); }
+    byNid.delete(S.nid);
+  });
 });
+
+// ---------------------------------------------------------------- seasons, battle pass and story
+SEA = require('./season')({ db, send, toast, system, changeGold, online, each, TOWNS, CFG, log, q, err, walletMsg, flush, nameOf, announcePlayer });
+for (const [k, fn] of Object.entries(SEA.handlers)) H[k] = fn;
+let seaBusy = false, seaLast = now();
+setInterval(async () => { if (seaBusy) return; seaBusy = true; const t = now(); try { await SEA.tick((t - seaLast) / 1000); } catch (e) { log('season tick error', e.stack || e.message); } seaLast = t; seaBusy = false; }, 1000);
 
 let lastTick = now();
 setInterval(tickMovement, 100);
@@ -874,12 +932,12 @@ setInterval(() => {
 }, 1000);
 setInterval(() => { for (const S of online.values()) { if (!S.ws.alive) { S.ws.close(4000, 'timeout'); continue; } S.ws.alive = false; S.ws.ping(); } }, 25000);
 let nextEvent = now() + CFG.EVENT_EVERY_MIN * 60000;
-setInterval(() => { if (now() > nextEvent) { nextEvent = now() + CFG.EVENT_EVERY_MIN * 60000; if (online.size) startEvent(); } }, 5000);
+setInterval(() => { if (now() > nextEvent) { nextEvent = now() + CFG.EVENT_EVERY_MIN * 60000; if (online.size) startEvent('season'); } }, 5000);
 
-async function shutdown() { log('saving everyone and shutting down…'); for (const S of online.values()) { S.dirty = true; await flush(S); } process.exit(0); }
+async function shutdown() { log('saving everyone and shutting down…'); if (SEA) await SEA.flushAll().catch(() => {}); for (const S of online.values()) { S.dirty = true; await flush(S); } process.exit(0); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
 
-loadRealm().then(() => server.listen(CFG.PORT, () => log(`Age of Crowns server listening on port ${CFG.PORT}`)))
+loadRealm().then(() => SEA.init()).then(() => server.listen(CFG.PORT, () => log(`Age of Crowns server listening on port ${CFG.PORT}`)))
   .catch(e => { console.error('Could not load the realm from Supabase. Did you run supabase/schema.sql?\n', e.message); process.exit(1); });
 
 module.exports = { server, CFG };

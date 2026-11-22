@@ -327,6 +327,13 @@ revoke insert, update, delete on all tables in schema public from anon, authenti
 grant select on all tables in schema public to authenticated;
 revoke all on all tables in schema public from anon;
 
+-- the multiplayer server (secret / service_role key) needs full access.
+-- Newer Supabase projects no longer grant this automatically.
+grant usage on schema public to service_role, authenticated;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role, authenticated;
+
 -- =====================================================================
 --  Make yourself a server admin (can /announce, /kick, /mute, start events):
 --    update public.profiles set is_admin = true

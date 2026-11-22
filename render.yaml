@@ -4,6 +4,7 @@ services:
   - type: web
     name: age-of-crowns-server
     runtime: node
+    plan: free
     rootDir: server
     buildCommand: "echo no build step"
     startCommand: node server.js

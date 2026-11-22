@@ -55,6 +55,7 @@
       return true;
     },
     outfit(o) { N.look = cleanLook(o); if (N.ready) send({ t: 'look', look: N.look }); },
+    joinStorm() { send({ t: 'joinStorm' }); },
     mapMarkers(ctx, tr, scale) {
       ctx.save();
       for (const e of N.events.values()) { const p = tr(e.x, e.z); ctx.fillStyle = '#ffd25a'; ctx.strokeStyle = '#3a2400'; ctx.lineWidth = 2 * scale; star(ctx, p[0], p[1], 9 * scale); ctx.fill(); ctx.stroke(); }
@@ -204,11 +205,11 @@
     estateOk() { const cb = N.estateCb; N.estateCb = null; if (cb) cb(); },
     estateNo(m) { N.estateCb = null; toast(m.msg, 'bad'); },
     prop(m) { if (m.owner) N.props.set(m.id, { id: m.id, kind: m.kind, town: m.town, owner: m.owner, mine: !!m.mine }); else N.props.delete(m.id); },
-    mil(m) { N.mil = m.mil; if (N.realmOpen) renderRealm(); },
+    mil(m) { N.mil = m.mil; syncCorps(); if (N.realmOpen) renderRealm(); },
     rankSet(m) {
-      const p = P(), R = A().RANKS; p.rank = m.rank; p.merit = Math.max(p.merit || 0, R[m.rank] ? R[m.rank].m : 0); try { A().outfit(); } catch (e) {}
+      const p = P(), R = A().RANKS; if (typeof m.army === 'number' && m.army >= 0) p.army = m.army; if (m.corps) p.corps = m.corps; p.rank = m.rank; p.merit = Math.max(p.merit || 0, R[m.rank] ? R[m.rank].m : 0); try { A().outfit(); } catch (e) {}
       if (N.mil) N.mil.rank = m.rank;
-      toast(m.by ? `${m.by} promotes you to ${R[m.rank].n}.` : (m.note || `Your rank is now ${R[m.rank].n}.`), m.by ? 'gold' : '');
+      if (m.by || m.note !== '') toast(m.by ? `${m.by} sets your rank to ${R[m.rank].n}.` : (m.note || `Your rank is now ${R[m.rank].n}.`), m.by ? 'gold' : '');
     },
     offices(m) {
       N.offices = m.mine || [];
@@ -231,10 +232,13 @@
     kicked(m) { N.noRetry = true; toast(m.msg, 'bad'); setTimeout(() => alertBox(m.msg), 300); },
     pong() {},
   };
+  // the corps a soldier serves in comes from the server; the game dresses and arms them from it
+  function syncCorps() { try { const p = P(); if (!p) return; const c = N.mil && N.mil.corps ? N.mil.corps : 'line'; if (N.mil && typeof N.mil.army === 'number') { p.army = N.mil.army; p.rank = N.mil.rank; } if (p.corps !== c) { p.corps = c; if (N.entered) A().outfit(); } } catch (e) {} }
   function enterNow(m) {
       if (!N.entered) {
         N.entered = true; const box = $('aocAuth'); if (box) box.remove();
         A().startGame(m.save, !N.creating);
+        syncCorps();
         buildUI();
         for (const h of m.history || []) addChat(h, true);
         for (const p of m.pms || []) addChat(p);
@@ -443,7 +447,8 @@
   }
   function promoteDialog(R) {
     const ranks = A().RANKS;
-    A().openPanel('Set army rank', R.name, `<select id="aocRank" class="aocin">${ranks.map((r, i) => `<option value="${i}">${esc(r.n)}</option>`).join('')}</select>`, [
+    const top = N.you && N.you.admin ? ranks.length - 1 : A().WARRANT_R;
+    A().openPanel('Set army rank', R.name, `<select id="aocRank" class="aocin">${ranks.slice(0, top + 1).map((r, i) => `<option value="${i}">${esc(r.n)}</option>`).join('')}</select>${top < ranks.length - 1 ? '<p class="aocsmall">Ranks above Warrant Officer are appointed by admins.</p>' : ''}`, [
       { label: 'Confirm', primary: true, fn: () => { send({ t: 'armyPromote', nid: R.nid, rank: +$('aocRank').value }); A().closePanel(); } }, { label: 'Back', fn: () => playerMenu(R) }]);
   }
   function appointDialog(R) {
@@ -535,7 +540,7 @@
       if (!m) return '<p>You are not a soldier. Visit the marshal in any capital to enlist; your army membership and rank are then kept by the server, and army chat opens to you.</p>';
       const K = A().K;
       const reg = m.regiment ? `<p>Regiment: <b>${esc(m.regiment.name)}</b> (${esc(m.role)}), commander ${esc(m.regiment.commander)}</p>${btn('regLeave', 'Leave regiment')}`
-        : (m.rank >= 3 ? `<div class="aoccard"><b>Raise a regiment</b> (200 gold)<input id="aocRN" class="aocin" maxlength="40" placeholder="e.g. The 3rd Frostguard Fusiliers">${btn('regCreate', 'Raise regiment')}</div>` : '<p class="aocsmall">Sergeants and above can raise their own regiment.</p>');
+        : (m.rank >= 4 ? `<div class="aoccard"><b>Raise a regiment</b> (200 gold)<input id="aocRN" class="aocin" maxlength="40" placeholder="e.g. The 3rd Frostguard Fusiliers">${btn('regCreate', 'Raise regiment')}</div>` : '<p class="aocsmall">Sergeants and above can raise their own regiment.</p>');
       return `<p><b>${esc(m.rankName)}</b> of the ${esc(K[m.army].name)} Army.</p>${reg}
         <p class="aocsmall">Regiments in your army: ${N.regiments.map(r => esc(r.name)).join(', ') || 'none yet'}.</p>
         <p class="aocsmall">Commanders and officers invite soldiers from the player menu (E beside them). The Marshal and Monarch can set any soldier's rank.</p>`;
@@ -567,9 +572,13 @@
         const me = N.you && r.nid === N.you.nid, col = KCOL[r.k] || '#fff';
         const st = r.online ? (r.x == null ? '<span class="aocdot idle"></span>Online' : '<span class="aocdot on"></span>In the world') : `<span class="aocdot"></span>Last seen ${ago(r.last)}`;
         const d = r.online && r.x != null && !me ? ` · ${fmtN(Math.round(Math.hypot(r.x - p.pos.x, r.z - p.pos.z)))} paces` : '';
+        const who = r.online ? `data-nid="${r.nid}"` : `data-uid="${esc(r.uid || '')}"`;
+        const milSel = `<div class="aocmil"><select class="aocin aocsm" data-milk ${who} aria-label="Army of ${esc(r.name)}"><option value="-1" ${r.army < 0 ? 'selected' : ''}>No army</option>${K.map((x, i) => `<option value="${i}" ${r.army === i ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`
+          + `<select class="aocin aocsm" data-milr ${who} aria-label="Rank of ${esc(r.name)}" ${r.army < 0 ? 'disabled' : ''}>${R.map((x, i) => `<option value="${i}" ${r.rank === i ? 'selected' : ''}>${esc(x.n)}</option>`).join('')}</select>`
+          + `<select class="aocin aocsm" data-milc ${who} aria-label="Corps of ${esc(r.name)}" ${r.army < 0 ? 'disabled' : ''}>${Object.entries(CORPS_N).map(([id, n]) => `<option value="${id}" ${(r.corps || 'line') === id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
         const acts = me ? '<i class="aocsmall">you</i>' : r.online ? `${r.x != null && !r.inside ? btn('admGo', 'Go to', { x: r.x, z: r.z, name: r.name }) : ''}${r.x != null ? btn('admBring', 'Bring here', { nid: r.nid, name: r.name }) : ''}${btn('pm', 'Message', { name: r.name })}${btn('admMute', r.muted ? 'Muted' : 'Mute 10 min', { name: r.name })}${btn('admKick', 'Kick', { name: r.name }, 'danger')}`
           : `${btn('admGo', 'Go to last place', { x: r.x, z: r.z, name: r.name })}${btn('pm', 'Message', { name: r.name })}`;
-        return `<tr><td><b style="color:${col}">${esc(r.name)}</b><br><i class="aocsmall">${esc(K[r.k] ? K[r.k].name : '')}${r.army >= 0 && R[r.rank] ? ' · ' + esc(R[r.rank].n) : ''}</i></td><td>${st}<br><i class="aocsmall">${where(r)}${d}</i></td><td class="aocnum">${fmtN(r.gold)}<br><i class="aocsmall">gold</i></td><td class="aocacts">${acts}</td></tr>`;
+        return `<tr><td><b style="color:${col}">${esc(r.name)}</b><br><i class="aocsmall">${esc(K[r.k] ? K[r.k].name : '')}${r.army >= 0 && R[r.rank] ? ' · ' + esc(R[r.rank].n) : ''}</i></td><td>${st}<br><i class="aocsmall">${where(r)}${d}</i></td><td class="aocnum">${fmtN(r.gold)}<br><i class="aocsmall">gold</i></td><td class="aocacts">${acts}${milSel}</td></tr>`;
       }).join('');
       return `<div class="aocadm"><input id="aocAQ" class="aocin" placeholder="Search players by name" value="${esc(f.q)}" aria-label="Search players">
         <select id="aocAS" class="aocin" aria-label="Show"><option value="all">Everyone (${L.list.length})</option><option value="online">Online (${on})</option><option value="offline">Offline (${L.list.length - on})</option></select>
@@ -614,8 +623,15 @@
     si.onchange = () => { f.show = si.value; renderRealm(); };
     oi.onchange = () => { f.sort = oi.value; renderRealm(); };
     $('aocAR').onclick = () => send({ t: 'adminList' });
+    // army, rank and corps: the server checks the admin and applies it, online or offline
+    pb.querySelectorAll('[data-milk],[data-milr],[data-milc]').forEach(sel => sel.onchange = () => {
+      const m = { t: 'adminSetMil' }; if (sel.dataset.nid) m.nid = +sel.dataset.nid; else m.uid = sel.dataset.uid;
+      if (sel.hasAttribute('data-milk')) m.army = +sel.value; else if (sel.hasAttribute('data-milr')) m.rank = +sel.value; else m.corps = sel.value;
+      send(m); toast('Saving…');
+    });
   }
   const fmtN = n => Number(n || 0).toLocaleString('en');
+  const CORPS_N = { line: 'Line Infantry', storm: 'Storm Troopers', ironmask: 'Ironmask Corps', heavy: 'Heavy Infantry', officer: 'Officer Corps' };
 
   // ------------------------------------------------------------------ home screen
   const NEWS = [

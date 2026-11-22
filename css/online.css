@@ -106,3 +106,5 @@ body.aoc-home .ssnhud,body.aoc-home #aocChat,body.aoc-home #aocBar,body.aoc-home
 #panel:not(.hidden){z-index:35}
 #panel:has(.aocadmt){width:min(900px,96vw)}
 #panel:has(.aocadmt) #pbody{max-width:none;font-size:15px}
+.aocmil{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.aocmil .aocsm{flex:1 1 110px;min-width:0;padding:3px 6px;font-size:13px}

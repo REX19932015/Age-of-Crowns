@@ -139,7 +139,8 @@ table.trade td .btn{padding:3px 8px;font-size:13px}
 #tJump{right:96px;bottom:calc(40px + env(safe-area-inset-bottom,0px))}
 #tUse{right:22px;bottom:calc(36px + env(safe-area-inset-bottom,0px))}
 #tDown{right:170px;bottom:calc(40px + env(safe-area-inset-bottom,0px))}
-@media (max-width:700px){#mini{width:120px;height:120px}#tl{min-width:0;max-width:62vw;padding:8px 10px}#pname{font-size:15px}#keys{display:none}#mission{bottom:calc(160px + env(safe-area-inset-bottom,0px))}#prompt{bottom:calc(170px + env(safe-area-inset-bottom,0px));font-size:14px}}
+@media (max-width:700px){#mini{width:120px;height:120px}#tl{min-width:0;max-width:62vw;padding:8px 10px}#pname{font-size:15px}#keys{display:none}#mission{bottom:calc(160px + env(safe-area-inset-bottom,0px))}#prompt{bottom:calc(192px + env(safe-area-inset-bottom,0px));font-size:14px;white-space:normal;max-width:calc(100vw - 24px);text-align:center;line-height:1.25}}
+@media (pointer:coarse) and (max-height:520px){#tr{transform:scale(.7);transform-origin:top right}#prompt{max-width:calc(100vw - 480px);white-space:normal;text-align:center;line-height:1.25}#toasts{max-width:calc(100vw - 520px)}}
 #devPanel{position:fixed;top:12px;right:12px;width:min(340px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;z-index:60;background:var(--panel);color:var(--ink);border:1px solid var(--edge);border-radius:10px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:14px}
 #devPanel .devh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:16px}
 #devPanel .devrow{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}#devPanel .devrow .btn{padding:5px 9px;font-size:13px}
@@ -1059,8 +1060,9 @@ const _muBase={},_muGeo=new Map();
 function unitOf(o){// soldiers wear a studio unit morph (Regiments, Great War Corps) from js/morphs.js: one seamless uniform + helmet + gear, skinned like the body; regions 1 uniform, 2 facings, 3 breeches take kingdom colours
 const M=window.MORPHS||{};let u=null;
  if(o.corps)u={line:'line',storm:'stormtrooper',ironmask:'ironmask',heavy:'sapper',officer:'officer'}[o.corps]||'line';
- else if(o.crossbelt||o.epaulettes)u=(o.hat==='furcap'||o.hat==='shako')?'grenadier':o.hat==='tricorn'?'musketeer':'regiment';
- else if(o.coat)u=(o.apron||o.hat==='cap'||o.hat==='bandana'||o.hat==='wide')?'civtunic':'civcoat';   // everyone else wears everyday clothes: a work tunic or a town coat
+ else if(o.crossbelt)u=(o.hat==='furcap'||o.hat==='shako')?'grenadier':o.hat==='tricorn'?'musketeer':'regiment';
+ else if(o.epaulettes)u='officercoat';   // officers: the regimental coat without crossbelts, under their own hat
+ else if(o.coat)u=o.apron?'civapron':(o.hat==='cap'||o.hat==='bandana'||o.hat==='wide')?'civtunic':'civcoat';   // everyone else wears everyday clothes: a work tunic or a town coat
  return u&&M[u]?u:null;}
 function mouseUnitGeo(u,coat,trim,pants){
  const key=u+'|'+coat+'|'+trim+'|'+pants;let g=_muGeo.get(key);if(g)return g;
@@ -1120,14 +1122,14 @@ function corpsBody(v,c,coat){const lea='#4a3222',leaD='#2e1e14',gm='#3b3c38';
  if(c==='officer'){v.add(GB.tcyl,coat,TM(0,.3,0,.45,.55,.41),shadeHex(coat,.7));v.add(GB.boxc,leaD,TM(0,1.1,.33,.06,.82,.025,0,0,.6));v.add(GB.boxc,leaD,TM(-.43,.72,.12,.08,.22,.15,.25,0,0));v.add(GB.sphs,'#b8913e',TM(-.47,.8,.16,.02));}}
 function makeMouse(o){
  const fur=o.fur,furL=mixHex(fur,'#f3e6d4',.5),furD=shadeHex(fur,.72),skin='#e3a3a7',skinD='#c4868b',coat=o.coat,trim=o.trim||'#e8e0cc',pants=o.pants||'#5a4a3a';
- const g=new THREE.Group(),body=new THREE.Bone();g.add(body);const U=unitOf(o),UH=U&&U!=='regiment'&&U!=='civcoat'&&U!=='civtunic';   // UH: the unit morph brings its own helmet
+ const g=new THREE.Group(),body=new THREE.Bone();g.add(body);const U=unitOf(o),UH=U&&!['regiment','officercoat','civcoat','civtunic','civapron'].includes(U);   // UH: the unit morph brings its own helmet
  const kB=['B3',U,fur,coat,trim,pants,o.apron,o.epaulettes,o.crossbelt,o.cape,o.ruler,o.sash,o.cuirass,o.corps].join('|');
  body.add(pm(partGeo(kB,v=>{
   // soldiers wear a studio unit morph (mouseUnitGeo); only accessories are built here
   if(o.crossbelt&&!U)for(const s of[-1,1])v.add(GB.boxc,'#efeae0',TM(0,1.08,.32,.07,.74,.025,0,0,s*.6));
   if(o.cuirass){v.add(GB.sph,'#a8aeb6',TM(0,1.06,.06,.46,.36,.42),'#6a6e76');v.add(GB.boxc,'#d9b24a',TM(0,1.06,.47,.05,.3,.02));}
   if(o.sash){v.add(GB.boxc,o.sash,TM(0,1.08,.31,.13,.86,.03,0,0,.62));v.add(GB.sph,'#d9b24a',TM(.18,.82,.36,.07,.07,.03));}
-  if(o.apron)v.add(GB.boxc,'#e9e2cf',TM(0,.86,.36,.5,.62,.03));
+  if(o.apron&&U!=='civapron')v.add(GB.boxc,'#e9e2cf',TM(0,.86,.36,.5,.62,.03));
   if(o.epaulettes)for(const s of[-1,1]){v.add(GB.sph,'#e2b84a',TM(s*.36,1.42,0,.15,.05,.16));for(let i=0;i<5;i++)v.add(GB.cylc,'#e2b84a',TM(s*(.3+i*.03),1.37,(i-2)*.05,.012,.09,.012));}
   if(o.corps&&!U)corpsBody(v,o.corps,coat);
   if(o.cape){v.add(GB.boxc,o.cape,TM(0,.86,-.38,.86,1.2,.05,.14,0,0),shadeHex(o.cape,.6));v.add(GB.cylc,'#f4f1ea',TM(0,1.42,-.03,.44,.13,.4));for(let i=0;i<8;i++){const a=i/8*TAU;v.add(GB.sphs,'#151515',TM(Math.cos(a)*.43,1.42,Math.sin(a)*.39-.03,.022));}}
@@ -4382,7 +4384,7 @@ function buildClubRoom(cx,cz){const{b,wb,R0}=interiorBase(cx,cz,26,20,9,'#3a2a22
  b.add(GB.box,'#3a2412',TM(cx,0,cz+8.6,10,1.3,1.2));for(let i=0;i<8;i++)b.add(GB.cyl,['#5a2a1a','#2a4a2a','#d9b24a'][i%3],TM(cx-3.5+i,1.3,cz+8.4,.12,.6,.12));addCol(cx,cz+8.6,4);
  for(const sx of[-1,1])portraitFrame(b,cx+sx*12.7,5,cz,sx<0?PI/2:-PI/2,2.4,3.2,'#5a4a3a');chandelier(b,cx,6.6,cz,2);
  civicKeeper(R0,{kind:'clubhost',name:'Steward '+pick(LAST),title:'Club steward',coat:'#1f2433',trim:'#d9b24a',x:cx+2,z:cz+7.2,yaw:PI,yaw0:PI});R0.spots.push({x:cx-8,z:cz+6.6,label:'Sit down at the card table (Twenty-One)',type:'cards'});finishRoom(b,wb,R0);ROOMS.club=R0;}
-function talkClub(n){const R0=ROOMS.club;const dr=R0.cur;const c=CLUBS.find(q=>q.id===dr.club);P.clubs=P.clubs||[];const mem=P.clubs.includes(c.id);const opts=[];
+function talkClub(n){const R0=ROOMS.club;const dr=R0.cur;const c=dr&&CLUBS.find(q=>q.id===dr.club);if(!c){bubble(n,'Welcome. The ledger’s away for the evening, so do come back another time.');return;}P.clubs=P.clubs||[];const mem=P.clubs.includes(c.id);const opts=[];
  if(!mem)opts.push({label:`Join ${c.name} (${c.fee} gold)`,primary:true,disabled:P.gold<c.fee,fn:()=>{P.gold-=c.fee;P.clubs.push(c.id);sfxChime();toast(`Welcome to ${c.name}! Members’ perk: ${c.perk}.`,'gold');if(c.k>=0)addRep(c.k,3);closePanel();save();}});
  else{opts.push({label:'Hear the latest gossip',fn:()=>{$('pbody').textContent='“'+gossip()+'”';}});if(c.id==='duel')opts.push({label:'Fence the club champion (50 gold stake)',primary:true,disabled:P.gold<50,fn:()=>{P.gold-=50;const ch=.3+skillLv('marksman')*.03+skillLv('leadership')*.02+(P.items.sabre?.2:0);if(rr()<ch){P.gold+=170;skillXP('leadership',4);toast('Touché! You beat the champion and win 170 gold.','gold');}else toast('The champion disarms you with a flick of the wrist. Better luck next time.','bad');closePanel();}});
   opts.push({label:'Resign your membership',fn:()=>{P.clubs=P.clubs.filter(x=>x!==c.id);toast(`You resign from ${c.name}.`);closePanel();save();}});}
@@ -5885,6 +5887,7 @@ function startGame(s,cont){if(s&&s.name&&!s.wsc){const sc=o=>{if(o&&typeof o.x==
   admin:!!s.admin,ruler:s.ruler===undefined?-1:s.ruler,rulerTitle:s.rulerTitle||'King',god:!!s.god,fast:!!s.fast,fly:!!s.fly});if(s.rel)for(let i=0;i<4;i++)for(let j=0;j<4;j++){REL[i][j]=s.rel[i][j];if(s.ally)ALLY[i][j]=s.ally[i][j];}if(!s.blocs2){for(const B of BLOCS){const[a,b]=B.m;const w=s.war&&s.war[a]&&s.war[a][b];if(!w){ALLY[a][b]=ALLY[b][a]=1;REL[a][b]=REL[b][a]=Math.max(REL[a][b],40);}}}if(s.news)NEWS.push(...s.news);if(s.meetings)MEETINGS.push(...s.meetings.map(M=>Object.assign({done:false},M)));if(s.treaties)TREATIES.push(...s.treaties);if(s.ai)s.ai.forEach((a,i)=>Object.assign(AI[i],a));if(s.reqs)REQS.push(...s.reqs);if(s.asmlog)ASM_LOG.push(...s.asmlog);if(s.mfav)s.mfav.forEach((v,i)=>MFAV[i]=v);if(s.regs&&s.regs.length){REGS.forEach(R=>{if(R.g)scene.remove(R.g);});REGS.length=0;s.regs.forEach(R=>{REGS.push(Object.assign({g:null,busy:false},R));regId=Math.max(regId,R.id);});}capRegiments();for(let k=0;k<4;k++){while(kSailors(k)>CAPS.navy){const S=NAVY.filter(n=>n.k===k&&!n.dead).pop();if(!S)break;S.dead=true;S.deadT=1e9;S.g.visible=false;}}if(s.occ)s.occ.forEach(([i,k])=>{if(TOWNS[i])occupy(TOWNS[i],k,true);});REGAUTO=!!s.regauto;if(s.war)for(let i=0;i<4;i++)for(let j=0;j<4;j++)WAR[i][j]=s.war[i][j];if(s.gov)Object.assign(GOV,s.gov);['pol','proj','min','cd'].forEach(f=>{if(!Array.isArray(GOV[f]))GOV[f]=[{},{},{},{}];});if(!Array.isArray(GOV.emb))GOV.emb=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];P.house=-1;if(s.house!=null&&s.house>=0){let hx=s.hx,hz=s.hz;if(hx==null){for(let i=0;i<OLDHOUSE.length;i+=3)if(OLDHOUSE[i]===s.house){hx=OLDHOUSE[i+1];hz=OLDHOUSE[i+2];break;}}if(hx!=null){let bi=-1,bd=1e9;DOORS.forEach((d,i)=>{if(d.room!=='house')return;const q=Math.hypot(d.x-hx,d.z-hz);if(q<bd){bd=q;bi=i;}});if(bi>=0&&bd<400)P.house=bi;}else if(s.house<DOORS.length&&DOORS[s.house].room==='house')P.house=s.house;}P.decor=s.decor||[];P.storage=s.storage||{};gameTime=s.t||gameTime;lastDay=Math.floor(gameTime);P.pos.set(s.x,0,s.z);}
  else{const t=capitalOf(P.home);const p=t.inn;P.pos.set(p.x+(t.x-p.x)*.2,0,p.z+(t.z-p.z)*.2);}
  P.gov=s.gov&&s.gov.k!==undefined&&s.gov.rank!==undefined?s.gov:{k:-1,rank:0,merit:0};P.armyChosen=!!s.armyChosen;
+ if(!isFinite(P.pos.x)||!isFinite(P.pos.z)){const t=capitalOf(P.home||0);const p=t.inn;P.pos.set(p.x+(t.x-p.x)*.2,0,p.z+(t.z-p.z)*.2);}   // a save without a position starts at the home inn
  P.pos.y=groundAt(P.pos.x,P.pos.z);outfit();updateHouseMarker();const ct=capitalOf(P.home);camYaw=Math.atan2(P.pos.x-ct.x,P.pos.z-ct.z);
  $('title').classList.add('hidden');$('hud').classList.remove('hidden');if(isTouch){$('touch').classList.remove('hidden');$('keys').classList.add('hidden');$('bLock').classList.add('hidden');}state='play';canvas.focus();updateGrass(P.pos.x,P.pos.z,true);
  if(!cont){setTimeout(()=>toast(`Welcome to ${ct.name}, ${P.name}.`,'gold'),300);setTimeout(()=>toast('Press E to talk. The marshal inside the castle takes recruits; merchants trade at the market stalls.'),2600);setTimeout(()=>toast(isTouch?'Drag on the right side to look around.':'Click the world to lock the mouse and look around. Press H for all controls.'),6000);}

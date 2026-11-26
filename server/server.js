@@ -67,7 +67,7 @@ function lockLook(S, look) {
   if (CORPS_HATS.has(l.hat) && (!c || CORPS_HAT[c] !== l.hat)) delete l.hat;
   return l;
 }
-const ESTATE_PRICE = 2500, ESTATES_PER_TOWN = 4, REGIMENT_PRICE = 200;
+const ESTATE_PRICE = 2500, ESTATES_PER_TOWN = 4, REGIMENT_PRICE = 200, MAX_HOUSES = 10;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const now = () => Date.now();
@@ -660,14 +660,13 @@ const H = {
     const h = HOUSES.get(str(m.id, 40)); if (!h) return err(S, 'That house is not for sale.');
     if (properties.has(h.id)) return send(S, { t: 'houseNo', id: h.id, msg: `That house belongs to ${nameOf(properties.get(h.id).owner)}.` });
     const town = TOWNS[h.town]; const price = W.houseprice[town.type] || 600;
-    const old = [...properties.values()].find(p => p.owner === S.id && p.kind === 'house');
-    const refund = old ? Math.round((W.houseprice[TOWNS[old.town].type] || 600) * .5) : 0;
-    const cost = Math.max(0, price - refund);
+    const owned = [...properties.values()].filter(p => p.owner === S.id && p.kind === 'house').length;
+    if (owned >= MAX_HOUSES) return send(S, { t: 'houseNo', id: h.id, msg: `You already own ${MAX_HOUSES} houses.` });
+    const old = null, cost = price;
     if (S.char.gold < cost) return send(S, { t: 'houseNo', id: h.id, msg: `You need ${cost} gold.` });
     const row = { id: h.id, kind: 'house', town: h.town, kingdom: town.k >= 0 ? town.k : null, owner: S.id, price };
     try { await db.insert('properties', row, { returning: false }); } catch (e) { return send(S, { t: 'houseNo', id: h.id, msg: 'Someone else just bought that house.' }); }
     properties.set(h.id, row);
-    if (old) { properties.delete(old.id); await q(db.remove('properties', { id: old.id })); each(O => send(O, { t: 'prop', id: old.id, owner: null })); }
     await changeGold(S.id, -cost, 'house', h.id);
     if (town.k >= 0) await changeTreasury(town.k, cost);
     each(O => send(O, { t: 'prop', id: h.id, kind: 'house', town: h.town, owner: S.char.name, mine: O === S }));

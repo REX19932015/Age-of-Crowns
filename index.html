@@ -926,8 +926,39 @@ function scnPlan(){
  {const P0=SCN.ice.pts;let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const p of P0){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);z0=Math.min(z0,p.z);z1=Math.max(z1,p.z);}const pad=SCN.ice.w0+60;SCN.ice.bb=[x0-pad,x1+pad,z0-pad,z1+pad];let L=0;SCN.ice.cum=[0];for(let i=1;i<P0.length;i++){L+=Math.hypot(P0[i].x-P0[i-1].x,P0[i].z-P0[i-1].z);SCN.ice.cum.push(L);}SCN.ice.L=L;}
  // Saltglass Atoll: an unclaimed ring of sand and black rock round a turquoise lagoon, far out in the south-western sea
  {const A={x:-4250,z:4400,R:520};A.Rr=A.R*.8;A.gaps=[.7,2.6,4.4];A.vil=5.6;SCN.atoll=A;}
- {const A={x:-3480,z:-700,R:720,H:215,gorges:[]};const r=mulberry(2929);for(const g0 of[[-2.6,.45],[-.9,-.2]]){const a=g0[0];const pts=[];for(let i=0;i<=10;i++){const u=i/10*2-1;const off=Math.sin(u*3.1+g0[1]*5)*90+(r()-.5)*50;pts.push({x:A.x+Math.cos(a)*u*A.R*1.15-Math.sin(a)*off,z:A.z+Math.sin(a)*u*A.R*1.15+Math.cos(a)*off});}A.gorges.push(pts);}SCN.alps=A;}
+ {const A={x:-3480,z:-700,R:720,H:215,gorges:[]};const r=mulberry(2929);for(const g0 of[[-2.6,.45],[-.9,-.2]]){const a=g0[0];const pts=[];for(let i=0;i<=10;i++){const u=i/10*2-1;const off=Math.sin(u*3.1+g0[1]*5)*90+(r()-.5)*50;pts.push({x:A.x+Math.cos(a)*u*A.R*1.15-Math.sin(a)*off,z:A.z+Math.sin(a)*u*A.R*1.15+Math.cos(a)*off});}A.gorges.push(pts);}
+  // Banff-style ranges: long tilted limestone slabs, all striking the same way, gentle dip slope on one side and a sheer stepped face on the other
+  A.ms=[];const r3=mulberry(3030);for(let t=0;t<600&&A.ms.length<8;t++){const a=r3()*TAU,d=Math.sqrt(r3())*A.R*.6;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;if(A.ms.some(m=>Math.hypot(m.x-x,m.z-z)<230))continue;const th=.62+(r3()-.5)*.4;
+   A.ms.push({x,z,c:Math.cos(th),s:Math.sin(th),L:250+r3()*170,Wd:240+r3()*130,Ws:50+r3()*30,H:(170+r3()*90)*(1-.25*d/A.R),side:r3()<.5?1:-1,ph:r3()*10});}
+  A.lakes=[];SCN.alps=A;}
+ // Cinderbowl Isle: a lone volcano in the northern sea with a deep blue crater lake, the Moonbowl
+ SCN.crater={x:-109,z:-6131,R:400,Rc:165,rim:74,lake:41,cone:{x:-109+38,z:-6131-30}};
+ SCN.wl=[];
  SCN.on=false;SCN.ready=true;}// switched on right after the towns are planned, so existing settlements keep their places
+function scnAlpsH(x,z){const A=SCN.alps;let best=0,sc=0;for(const m of A.ms){const ex=x-m.x,ez=z-m.z;const u=ex*m.c+ez*m.s;if(u>m.L||u<-m.L)continue;const v=(-ex*m.s+ez*m.c)*m.side;if(v>m.Wd||v<-m.Ws*1.6)continue;
+  let g=1-(u/m.L)*(u/m.L);g=Math.pow(g,.38);const crest=1-.1*Math.abs(Math.sin(u*.012+m.ph))-.12*fbm(u*.009+m.ph,m.ph*2,2);
+  let f,scarp=0;if(v>=0){f=1-v/m.Wd;f=f*(.9+.1*f);}else{const q=-v/m.Ws;scarp=1;f=q<1?1-Math.pow(q,.55)*.8:Math.max(0,.2*(1-(q-1)/.6));}
+  const hm=m.H*crest*g*f;if(hm>best){best=hm;sc=scarp;}}
+ if(best>4){const st=10.5,tq=best/st,fr=tq-Math.floor(tq);const stepped=(Math.floor(tq)+smooth(.05,.55,fr))*st;best=lerp(best,stepped,sc?.6:.22);best+=4*(fbm(x*.05,z*.05,2)-.5)*Math.min(1,best/30);}
+ return best;}
+function scnLakeD(L0,x,z){const a=Math.atan2(z-L0.z,x-L0.x);return Math.hypot(x-L0.x,z-L0.z)/(L0.r*(1+.13*Math.sin(a*3+L0.ph)+.07*Math.sin(a*5-L0.ph)));}
+// planned once the towns are fixed and before anything is built on the land
+function scnLate(){
+ // Oakcross grows from a hamlet into a proper little town
+ {const oc=TOWNS.find(q=>q.name==='Oakcross'&&q.remote);if(oc){oc.type='town';oc.r=TSIZE.town;}}
+ // the Hollowroar river: one straight channel from the plunge pool to Hollow Lake, never running uphill
+ {const C=SCN.canyon;const S={x:C.x+C.dx*C.Rb*.7,z:C.z+C.dz*C.Rb*.7};const W=[];let w=1e9,end=0;for(let u=0;u<900;u+=5){const x=S.x+C.dx*u,z=S.z+C.dz*u;const r=rawHeight(x,z);w=Math.min(w,r-2.6);W.push(w);if(r<-2.5){end++;if(end>4)break;}}
+  SCN.riv={x:S.x,z:S.z,dx:C.dx,dz:C.dz,W,len:(W.length-1)*5};}
+ // glacial lakes in the Fangtooth valleys
+ {const A=SCN.alps;const r4=mulberry(5757);const NM=['Lake Opaline','Silverfang Tarn','Glassmere','Moraine Tarn'];for(let t=0;t<4000&&A.lakes.length<4;t++){const a=r4()*TAU,d=Math.sqrt(r4())*A.R*.78;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;const r=58+r4()*42;
+  if(A.lakes.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+r+170))continue;let bad=false;for(let k=0;k<8&&!bad;k++){const aa=k/8*TAU;if(scnAlpsH(x+Math.cos(aa)*r,z+Math.sin(aa)*r)>9)bad=true;}if(bad||scnAlpsH(x,z)>4)continue;
+  if(A.gorges.some(G=>scnPolyD(x,z,G)<r+50))continue;if(TOWNS.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+r+140))continue;const h=rawHeight(x,z);if(h<7||h>45)continue;
+  let mn=1e9,mx=-1e9;for(let k=0;k<12;k++){const aa=k/12*TAU;const hh=rawHeight(x+Math.cos(aa)*r*1.2,z+Math.sin(aa)*r*1.2);mn=Math.min(mn,hh);mx=Math.max(mx,hh);}if(mx-mn>16||mn<5)continue;
+  A.lakes.push({x,z,r,y:Math.max(h,mn)+1.2,ph:r4()*9,name:NM[A.lakes.length]});}}
+}
+// after roads and woods exist: drop any glacial lake a road wanders into, and pick sites for the new wonders
+function scnLate2(){const A=SCN.alps;A.lakes=A.lakes.filter(L0=>!onWay(L0.x,L0.z,L0.r+18));try{scnWonderSites();}catch(e){console.error(e);}}
+function scnRivQ(x,z){const R=SCN.riv;const ex=x-R.x,ez=z-R.z;let u=ex*R.dx+ez*R.dz;const v=-ex*R.dz+ez*R.dx;if(u<-40||u>R.len+40)return null;let d=Math.abs(v);if(u<0){d=Math.hypot(u,v);u=0;}else if(u>R.len){d=Math.hypot(u-R.len,v);u=R.len;}const f=u/5,i=Math.min(R.W.length-2,Math.floor(f));return{d,w:lerp(R.W[i],R.W[i+1],f-i),u};}
 function scnPolyD(x,z,P0){let bd=1e9;for(let i=0;i<P0.length-1;i++){const a=P0[i],b=P0[i+1];const vx=b.x-a.x,vz=b.z-a.z,l2=vx*vx+vz*vz;const t=clamp(((x-a.x)*vx+(z-a.z)*vz)/l2,0,1);const d=Math.hypot(x-a.x-vx*t,z-a.z-vz*t);if(d<bd)bd=d;}return bd;}
 function scnIceQ(x,z){const I=SCN.ice,P0=I.pts;let bd=1e9,bt=0;for(let i=0;i<P0.length-1;i++){const a=P0[i],b=P0[i+1];const vx=b.x-a.x,vz=b.z-a.z,l2=vx*vx+vz*vz;const t=clamp(((x-a.x)*vx+(z-a.z)*vz)/l2,0,1);const d=Math.hypot(x-a.x-vx*t,z-a.z-vz*t);if(d<bd){bd=d;bt=(I.cum[i]+t*Math.sqrt(l2))/I.L;}}return{d:bd,t:bt};}
 function scnIceW(t,x,z){return lerp(SCN.ice.w0,SCN.ice.w1,t)*(.86+.28*fbm(x*.004+11,z*.004-5,3));}
@@ -942,26 +973,43 @@ function scnApply(x,z,h){if(!SCN||!SCN.on)return h;
   const C=SCN.canyon;const ex=x-C.x,ez=z-C.z;const u=ex*C.dx+ez*C.dz,v=-ex*C.dz+ez*C.dx;const rb=C.Rb*(1+.08*Math.sin(Math.atan2(v,u)*6));const dB=Math.hypot(u,v)-rb;const wv=C.W*(1+u/C.L*.9)*(1+.12*Math.sin(u*.05));const dCh=(u>0&&u<C.L)?Math.abs(v)-wv:1e9;const sd=Math.min(dB,dCh);
   const cut=1-smooth(-1,7,sd);const jag=(fbm(x*.07,z*.07,2)-.5)*4*(1-cut);h=h+lift*(1-cut)+jag*smooth(10,40,lift);
   if(cut>0){const pool=1-smooth(C.Rb*.4,C.Rb*.95,Math.hypot(u,v));h-=cut*(1.8+pool*3.2);}}}}
- {const A=SCN.alps;const dx=x-A.x,dz=z-A.z;if(Math.abs(dx)<A.R*1.25&&Math.abs(dz)<A.R*1.25){const d=Math.hypot(dx,dz);const a=Math.atan2(dz,dx);const Re=A.R*(1+.14*Math.sin(a*3+1.3)+.08*Math.sin(a*5-.4));if(d<Re){
-  const mask=Math.pow(1-smooth(Re*.28,Re,d),1.35);let rs=0,amp=1,fq=.0042,wt=1;for(let o=0;o<5;o++){let n=fbm(x*fq+o*13.7,z*fq-o*7.1,1);n=1-Math.abs(n*2-1);n*=n;rs+=n*amp*wt;wt=clamp(n*1.7,0,1);amp*=.5;fq*=2.1;}
-  let lift=A.H*mask*Math.pow(rs/1.55,1.4)+mask*16*Math.pow(Math.abs(fbm(x*.045,z*.045,2)-.5)*2,1.6);
+ {const A=SCN.alps;const dx=x-A.x,dz=z-A.z;if(Math.abs(dx)<A.R*1.25&&Math.abs(dz)<A.R*1.25){const d=Math.hypot(dx,dz);const a=Math.atan2(dz,dx);const Re=A.R*(1+.12*Math.sin(a*3+1.3)+.07*Math.sin(a*5-.4));if(d<Re){
+  const mask=1-smooth(Re*.7,Re,d);let lift=(scnAlpsH(x,z)+14*fbm(x*.006+2,z*.006-4,3))*mask;
   let gd=1e9;for(const G of A.gorges)gd=Math.min(gd,scnPolyD(x,z,G));const gw=16+10*fbm(x*.01,z*.01,2);const gf=smooth(gw,gw+34,gd);lift*=gf;
-  if(ROADS.length)lift*=smooth(24,120,roadD(x,z));h+=lift-(1-gf)*2.5*mask;}}}
+  if(ROADS.length)lift*=smooth(24,120,roadD(x,z));
+  for(const L0 of A.lakes){const dl=Math.hypot(x-L0.x,z-L0.z);if(dl>L0.r*2.2)continue;const dn=scnLakeD(L0,x,z);lift*=smooth(.95,1.6,dn);}
+  h+=lift-(1-gf)*2.5*mask;
+  for(const L0 of A.lakes){const dl=Math.hypot(x-L0.x,z-L0.z);if(dl>L0.r*2.2)continue;const dn=scnLakeD(L0,x,z);if(dn<1.7){const shore=lerp(Math.max(h,L0.y+.5),h,smooth(1.25,1.7,dn));const bed=L0.y-.8-4.5*(1-Math.min(1,dn)*Math.min(1,dn));h=dn<1?Math.min(shore,lerp(bed,shore,smooth(.82,1,dn))):shore;}}}}}
+ {const V=SCN.crater;const dx=x-V.x,dz=z-V.z;if(dx*dx+dz*dz<V.R*V.R*1.05){const d=Math.sqrt(dx*dx+dz*dz),a=Math.atan2(dz,dx),n=fbm(x*.02,z*.02,3);const Rc=V.Rc*(1+.06*Math.sin(a*5+1));let c;
+  if(d<Rc){const q=d/Rc;c=V.lake-12+(V.rim-(V.lake-12))*Math.pow(q,5);c=Math.max(c,V.lake+13-Math.hypot(x-V.cone.x,z-V.cone.z)*.42);}
+  else{const q=Math.min(1,(d-Rc)/(V.R-Rc));c=(V.rim+4*n)*Math.pow(1-q,1.25)*(.9+.2*n)-14*q-5*Math.abs(Math.sin(a*13+n*4))*smooth(.15,.6,q)*(1-q);}
+  h=d<Rc*1.04?c:Math.max(h,lerp(c,h,smooth(.9,1.02,d/V.R)));}}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h<2.9){const q=scnIceQ(x,z);const W=scnIceW(q.t,x,z);if(q.d<W){const n=fbm(x*.02,z*.02,3);let ih=2.9+n*.5;if(q.t<.22)ih+=6.5*(1-q.t/.22)*(.7+.6*n);const crk=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5);if(crk<.018)ih-=.9;ih+=Math.max(0,.04-Math.abs(fbm(x*.011-2,z*.011+6,2)-.5))*30;h=Math.max(h,ih);}}}
  {const A=SCN.atoll;const dx=x-A.x,dz=z-A.z;if(Math.abs(dx)<A.R*1.6&&Math.abs(dz)<A.R*1.6){const d=Math.hypot(dx,dz);if(d<A.R*1.55){const a=Math.atan2(dz,dx);const w=scnAtollW(a,x,z);const off=Math.abs(d-A.Rr);let base;if(d<A.Rr)base=-1.6-2.2*smooth(A.Rr*.2,A.Rr*.85,A.Rr-d)-.6*fbm(x*.03,z*.03,2);else base=lerp(-2.6,-24,smooth(A.R*1.05,A.R*1.5,d));
   h=Math.max(h,base);if(off<w){const land=1-smooth(w*.55,w,off);const dune=2.2+2.6*fbm(x*.03+1,z*.03-2,3)*land;h=Math.max(h,lerp(base,dune,smooth(0,.35,land)));}}}}
+ {const R=SCN.riv;if(R){const q=scnRivQ(x,z);if(q&&q.d<40){const w=12;const t=q.d<w?q.w-1.8*(1-(q.d/w)*(q.d/w)):q.w-.15+(q.d-w)*.42;h=Math.min(h,t);}}}
  return h;}
 // colours painted over the terrain for the new places: [r,g,b,mask]
+function lin(r,g,b,m){return[Math.pow(r,2.2),Math.pow(g,2.2),Math.pow(b,2.2),m];}
+function scnMossZ(){if(SCN.mossZ)return SCN.mossZ;const Z=typeof DEEPWOODS!=='undefined'&&DEEPWOODS.find(d=>d.name==='the Mossgloom');if(Z)SCN.mossZ=Z;return Z||null;}
 function scnCol(x,z,h,slope){if(!SCN||!SCN.on)return null;
+ {const Z=scnMossZ();if(Z&&Math.abs(x-Z.x)<Z.r*1.1&&Math.abs(z-Z.z)<Z.r*1.1&&h>1.5){const d=Math.hypot(x-Z.x,z-Z.z);if(d<Z.r*1.1){const m=1-smooth(Z.r*.8,Z.r*1.1,d);const n=fbm(x*.035+7,z*.035-3,3),v=vnoise(x*.2,z*.2);
+  if(slope>.3)return lin(lerp(.2,.27,n),lerp(.27,.34,n),lerp(.15,.18,n),m);let c=[lerp(.1,.17,n),lerp(.2,.31,n),lerp(.06,.09,n)];if(v>.82)c=[.2,.36,.1];return lin(c[0],c[1],c[2],m);}}}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h>2.2&&h<34){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z)+10){const n=vnoise(x*.05,z*.05),c=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5)<.022;return c?[.46,.66,.78,1]:[lerp(.86,.95,n),lerp(.92,.97,n),lerp(.96,1,n),1];}}}
  {const A=SCN.atoll;const d=Math.hypot(x-A.x,z-A.z);if(d<A.R*1.2&&h>-.2){const t=smooth(1.4,3.6,h);return[lerp(.93,.3,t),lerp(.87,.55,t),lerp(.72,.22,t),1];}}
  {const K0=SCN.karst;const dc=Math.hypot(x-K0.x,z-K0.z);if(dc<K0.R&&h>1.2){const rk=smooth(.18,.42,slope);return[lerp(.2,.32,rk),lerp(.42,.33,rk),lerp(.14,.3,rk),1];}}
  {const S=SCN.spires;const dd=Math.hypot(x-S.x,z-S.z);if(dd<S.R*2.05){if(slope>.28){const b=Math.sin(h*.35+fbm(x*.01,z*.01,2)*2)*.5+.5;return[lerp(.5,.66,b),lerp(.45,.56,b),lerp(.37,.44,b),1];}if(h>18){const v=fbm(x*.03,z*.03,2);return[lerp(.17,.26,v),lerp(.38,.47,v),lerp(.12,.16,v),1-smooth(S.R*1.8,S.R*2.05,dd)];}}}
  {const Hh=SCN.high;const d=Math.hypot(x-Hh.x,z-Hh.z);if(d<Hh.R){if(slope>.26){const b=Math.sin(h*.5+fbm(x*.01,z*.01,2)*2.5)*.5+.5,mo=fbm(x*.04,z*.04,2);let c=[lerp(.24,.36,b),lerp(.23,.31,b),lerp(.21,.27,b)];if(mo>.58)c=[c[0]*.8,c[1]*1.15,c[2]*.75];return[c[0],c[1],c[2],1];}if(h>30){const v=fbm(x*.02+5,z*.02,3),hv=fbm(x*.05,z*.05,2);let c=[lerp(.3,.42,v),lerp(.38,.46,v),lerp(.16,.2,v)];if(hv>.62)c=[.42,.3,.4];return[c[0],c[1],c[2],(1-smooth(Hh.R*.8,Hh.R,d))*smooth(30,40,h)];}}}
- {const A=SCN.alps;if(Math.abs(x-A.x)<A.R*1.25&&Math.abs(z-A.z)<A.R*1.25&&h>1){const d=Math.hypot(x-A.x,z-A.z);if(d<A.R*1.2){const fade=1-smooth(A.R*.95,A.R*1.2,d);const mo=fbm(x*.03+4,z*.03-2,3),st=Math.sin(h*.6+fbm(x*.012,z*.012,2)*3)*.5+.5;
-  if(slope>.42){let c=[lerp(.2,.32,st),lerp(.2,.3,st),lerp(.19,.27,st)];if(mo>.52)c=[lerp(c[0],.16,.75),lerp(c[1],.27,.75),lerp(c[2],.1,.75)];return[c[0],c[1],c[2],fade];}
-  if(slope>.22){const c=mo>.45?[.17,.29,.1]:[.27,.27,.24];return[c[0],c[1],c[2],fade*smooth(.22,.32,slope)];}
-  if(h<92){const fl=vnoise(x*.25,z*.25);let c=[lerp(.18,.25,mo),lerp(.36,.42,mo),lerp(.1,.14,mo)];if(fl>.86)c=[.82,.72,.25];else if(fl>.8)c=[.6,.42,.7];return[c[0],c[1],c[2],fade];}}}}
+ {const A=SCN.alps;if(Math.abs(x-A.x)<A.R*1.25&&Math.abs(z-A.z)<A.R*1.25&&h>1){const d=Math.hypot(x-A.x,z-A.z);if(d<A.R*1.2){const fade=1-smooth(A.R*.95,A.R*1.2,d);const mo=fbm(x*.03+4,z*.03-2,3),n=fbm(x*.02,z*.02,2);
+  for(const L0 of A.lakes){if(Math.hypot(x-L0.x,z-L0.z)>L0.r*1.6)continue;const dn=scnLakeD(L0,x,z);if(dn<1.18&&h<L0.y+2.5)return lin(lerp(.46,.56,mo),lerp(.44,.52,mo),lerp(.4,.46,mo),fade);}
+  const snowL=172+30*n;
+  if(h>snowL&&slope<.5){const gl=slope<.26&&h>snowL+10;return gl?lin(.84,.92,.97,fade):lin(lerp(.9,.97,mo),lerp(.92,.98,mo),lerp(.95,1,mo),fade);}
+  if(slope>.4){let c=[lerp(.36,.5,mo),lerp(.37,.5,mo),lerp(.38,.5,mo)];if(n>.6)c=[c[0]*.86,c[1]*.85,c[2]*.84];if(h>snowL-25){const sn=(h>snowL?.5:.25)*(1-smooth(.5,.8,slope));c=[lerp(c[0],.95,sn),lerp(c[1],.96,sn),lerp(c[2],.98,sn)];}if(h<85&&mo>.58)c=[c[0]*.7,c[1]*.82,c[2]*.62];return lin(c[0],c[1],c[2],fade);}
+  if(slope>.24){const c=h>100?[lerp(.45,.55,mo),lerp(.44,.53,mo),lerp(.42,.5,mo)]:[lerp(.16,.22,mo),lerp(.23,.29,mo),lerp(.13,.16,mo)];return lin(c[0],c[1],c[2],fade*smooth(.24,.32,slope));}
+  if(h>108){const c=[lerp(.4,.5,mo),lerp(.46,.52,mo),lerp(.3,.35,mo)];return lin(c[0],c[1],c[2],fade);}
+  const fl=vnoise(x*.25,z*.25);let c=[lerp(.13,.19,mo),lerp(.22,.28,mo),lerp(.11,.14,mo)];if(n>.62){c=[lerp(.3,.38,mo),lerp(.45,.52,mo),lerp(.18,.23,mo)];if(fl>.88)c=[.85,.75,.3];else if(fl>.83)c=[.6,.47,.76];}return lin(c[0],c[1],c[2],fade);}}}
+ {const V=SCN.crater;const d=Math.hypot(x-V.x,z-V.z);if(d<V.R&&h>.5){const mo=fbm(x*.04,z*.04,2);if(h<3)return lin(.24,.22,.22,1);if(slope>.42)return lin(lerp(.3,.42,mo),lerp(.26,.33,mo),lerp(.25,.3,mo),1);if(h>V.rim-12&&d>V.Rc*.85)return lin(lerp(.5,.58,mo),lerp(.4,.45,mo),lerp(.34,.38,mo),1);return lin(lerp(.24,.32,mo),lerp(.36,.44,mo),lerp(.16,.2,mo),1);}}
+ for(const w of SCN.wl){if(!w.col)continue;const d=Math.hypot(x-w.x,z-w.z);if(d<w.r){const c=w.col(x,z,h,slope,d);if(c)return c;}}
  return null;}
 function scnName(x,z){if(!SCN||!SCN.on)return null;
  if(SCN.castle&&Math.hypot(x-SCN.castle.x,z-SCN.castle.z)<95)return 'Dunwhisker Castle';
@@ -970,8 +1018,10 @@ function scnName(x,z){if(!SCN||!SCN.on)return null;
  {const S=SCN.spires;if(Math.hypot(x-S.x,z-S.z)<S.R*1.05)return 'The Thousand Spires';}
  {const C=SCN.canyon;const ex=x-C.x,ez=z-C.z;const u=ex*C.dx+ez*C.dz,v=-ex*C.dz+ez*C.dx;if(Math.hypot(u,v)<C.Rb+60||(u>0&&u<C.L*.8&&Math.abs(v)<70))return 'Hollowroar Falls';}
  {const Hh=SCN.high;if(Math.hypot(x-Hh.x,z-Hh.z)<Hh.R*.9)return 'The Pinehallow Highlands';}
- {const A=SCN.alps;if(Math.hypot(x-A.x,z-A.z)<A.R){let gd=1e9,gi=0;A.gorges.forEach((G,i)=>{const q=scnPolyD(x,z,G);if(q<gd){gd=q;gi=i;}});if(gd<40)return['Grimwater Gorge','Mossgullet Gorge'][gi];return 'The Fangtooth Peaks';}}
+ {const A=SCN.alps;if(Math.hypot(x-A.x,z-A.z)<A.R){let gd=1e9,gi=0;A.gorges.forEach((G,i)=>{const q=scnPolyD(x,z,G);if(q<gd){gd=q;gi=i;}});if(gd<40)return['Grimwater Gorge','Mossgullet Gorge'][gi];for(const L0 of A.lakes)if(Math.hypot(x-L0.x,z-L0.z)<L0.r*1.4)return L0.name;return 'The Fangtooth Peaks';}}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&heightAt(x,z)>2.4){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z))return 'The Rimeshelf';}}
+ {const V=SCN.crater;const d=Math.hypot(x-V.x,z-V.z);if(d<V.Rc*.85)return 'The Moonbowl';if(d<V.R)return 'Cinderbowl Isle';}
+ for(const w of SCN.wl)if(Math.hypot(x-w.x,z-w.z)<w.r)return w.name;
  return null;}
 function scnUnclaimed(x,z){return !!(SCN&&SCN.on&&SCN.atoll&&Math.hypot(x-SCN.atoll.x,z-SCN.atoll.z)<SCN.atoll.R*1.35);}
 // Oakcross: a lone village on the coast beside the Rimeshelf, near where it always stood
@@ -992,7 +1042,7 @@ function scnRock(P,Cc,I,x,y,z,r0,H,seed,pal,noCap){const rnd=mulberry(seed);cons
  if(!noCap){const top=P.length/3;P.push(x+lx*H,y+H+1.2,z+lz*H);const cl=cm.clone().convertSRGBToLinear();Cc.push(cl.r,cl.g,cl.b);const tr=base+LV*SEG;for(let i=0;i<SEG;i++)I.push(tr+i,top,tr+(i+1)%SEG);}
  return{top:y+H};}
 function scnMesh(P,Cc,I){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('color',new THREE.Float32BufferAttribute(Cc,3));g.setIndex(I);g.computeVertexNormals();const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.96,flatShading:true}));m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}
-function scnVeg(t,x,y,z,s){const L0=VEGLS[t];if(!L0)return;L0.push({x,y,z,s,ry:rr()*TAU,c:.85+rr()*.25,v:Math.floor(rr()*2)});}
+function scnVeg(t,x,y,z,s,c){const L0=VEGLS[t];if(!L0)return;const it={x,y,z,s,ry:rr()*TAU,c:c||.85+rr()*.25,v:Math.floor(rr()*2)};L0.push(it);return it;}
 function scnClearVeg(test,keepTypes){const LS=VEGLS;for(const k in LS){if(keepTypes&&keepTypes.includes(k))continue;LS[k]=LS[k].filter(it=>{if(test(it.x,it.z)){if(it.col)delCol(it.col);return false;}return true;});}}
 function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND=['#9c8f78','#76695a','#3f5e26','#4a4038'],KARST=['#4a4c48','#666760','#35592a','#2a2b27'],ATR=['#2e2f2d','#45463f','#3d5a28','#1d1e20'];
  // ---- the Thousand Spires
@@ -1016,22 +1066,37 @@ function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND
   const ribbon=(pts,w0,w1,yo)=>{const pos=[],idx=[];pts.forEach((q,i)=>{const nx=i<pts.length-1?pts[i+1].x-q.x:q.x-pts[i-1].x,nz=i<pts.length-1?pts[i+1].z-q.z:q.z-pts[i-1].z,l=Math.hypot(nx,nz)||1;const w=lerp(w0,w1,i/(pts.length-1));const y=Math.max(q.y!==undefined?q.y:heightAt(q.x,q.z)+yo,.15);pos.push(q.x-nz/l*w,y,q.z+nx/l*w,q.x+nz/l*w,y,q.z-nx/l*w);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,wm));};
   // stream across the moor to the lip
   {const st=[];for(let i=0;i<=24;i++){const u=i/24;const d=lipD+300*(1-u);st.push({x:C.x-C.dx*d+Math.sin(u*8)*14*(1-u)*C.dz,z:C.z-C.dz*d-Math.sin(u*8)*14*(1-u)*C.dx});}ribbon(st,4,7,.35);}
-  // river down the canyon floor and on to Hollow Lake
-  {const st=[];const L0=C.lake;const ex={x:C.x+C.dx*C.L,z:C.z+C.dz*C.L};const n=40;for(let i=0;i<=n;i++){const u=i/n;let x,z;if(u<.6){const t=u/.6;x=lerp(C.x+C.dx*C.Rb*.8,ex.x,t);z=lerp(C.z+C.dz*C.Rb*.8,ex.z,t);}else{const t=(u-.6)/.4;x=lerp(ex.x,L0.x,t)+Math.sin(t*6)*18*(1-t);z=lerp(ex.z,L0.z,t);}st.push({x,z});}
-   let prev=py;for(const q of st){const g=heightAt(q.x,q.z)+.35;q.y=Math.min(prev,g);prev=q.y;if(q.y<.3)q.y=.15;}ribbon(st,7,11,.35);}
+  // the river: one continuous, flowing channel from the plunge pool all the way down into Hollow Lake, with a second fall where it leaves the gorge
+  {const R=SCN.riv;const pts=[];for(let k=0;k<R.W.length;k++){const u=k*5;pts.push({x:R.x+R.dx*u,z:R.z+R.dz*u,y:Math.min(R.W[k],py),u});}
+   let runs=[],cur=[];for(let k=0;k<pts.length;k++){if(pts[k].y<.2){cur.push(pts[k]);break;}cur.push(pts[k]);if(k<pts.length-1&&pts[k].y-pts[k+1].y>1.1){let e=k+1;while(e<pts.length-1&&pts[e].y-pts[e+1].y>1.1)e++;runs.push(cur);const lip=pts[k],base=pts[e];const by=Math.max(base.y,.1);
+     waterfall(lip.x,lip.y+.15,lip.z,base.x,by,base.z,17,runs.length===1?'Lower Hollowroar Falls':null);SCN.lowerFall={x:base.x,z:base.z,y:by};cur=[base];k=e;if(base.y<.2)break;}}
+   if(cur.length>1)runs.push(cur);
+   for(const run of runs){const pos=[],uv=[],idx=[];let L=0;run.forEach((q,i)=>{const w=lerp(7.5,10.5,q.u/R.len);if(i)L+=Math.hypot(q.x-run[i-1].x,q.z-run[i-1].z);pos.push(q.x-R.dz*w,q.y,q.z+R.dx*w,q.x+R.dz*w,q.y,q.z-R.dx*w);uv.push(0,L/11,1,L/11);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,rvMat());m.renderOrder=2;scene.add(m);}
+   // white water where the bed steps down
+   const fb=new VB(),r5=mulberry(5353);for(let k=1;k<pts.length;k++){const dy=pts[k-1].y-pts[k].y;if(dy<.25||dy>1.1||pts[k].y<.3)continue;for(let n=0;n<4;n++)fb.add(GB.sphs,'#fff',TM(pts[k].x+(r5()-.5)*14*R.dz,pts[k].y+.05,pts[k].z-(r5()-.5)*14*R.dx,.8+r5()*1.2,.25,.8+r5()*1.2));}
+   if(fb.p.length)scene.add(new THREE.Mesh(fb.geometry(),new THREE.MeshBasicMaterial({color:0xeef8fb,transparent:true,opacity:.6})));}
   const r2=mulberry(5151);for(let t=0;t<1600;t++){const a=r2()*TAU,d=Math.sqrt(r2())*Hh.R*.95;const x=Hh.x+Math.cos(a)*d,z=Hh.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<6)continue;const sl=Math.abs(heightAt(x+2,z)-h)+Math.abs(heightAt(x,z+2)-h);if(sl>3.2){if(r2()<.12)scnVeg('rock',x,h-.3,z,1+r2()*2);continue;}if(onWay(x,z,4))continue;const q=r2();const grove=fbm(x*.01+2,z*.01,3)>.5;if(grove&&q<.7)scnVeg('pine',x,h-.25,z,.7+r2()*.7);else if(q<.12)scnVeg('rmoss',x,h-.3,z,.8+r2()*1.6);else if(q<.3)scnVeg('fern',x,h-.25,z,.8+r2()*.5);}
   for(let t=0;t<500;t++){const a=r2()*TAU,d=C.Rb+4+r2()*90;const x=C.x+Math.cos(a)*d,z=C.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<pb+20)continue;scnVeg('pine',x,h-.25,z,.8+r2()*.6);}
   LANDMARKS.push({name:'the Pinehallow Highlands',x:Hh.x,z:Hh.z,r:Hh.R});SCN.mist={x:lx+C.dx*10,z:lz+C.dz*10};}
- // ---- the Fangtooth Peaks
- {const A=SCN.alps;const r2=mulberry(6464);for(let t=0;t<7000;t++){const a=r2()*TAU,d=Math.sqrt(r2())*A.R;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<2)continue;const sl=Math.abs(heightAt(x+2,z)-h)+Math.abs(heightAt(x,z+2)-h);if(onWay(x,z,4))continue;const q=r2();
-   if(sl>2.6){if(q<.18)scnVeg(h>95?'rsnow':'rock',x,h-.4,z,1.2+r2()*2.6);else if(q<.32)scnVeg('rmoss',x,h-.4,z,1+r2()*2.2);continue;}
-   if(h>110){if(q<.12)scnVeg('rsnow',x,h-.3,z,.8+r2()*1.8);continue;}
-   if(h>75){if(q<.25)scnVeg('snowpine',x,h-.25,z,.6+r2()*.5);else if(q<.42)scnVeg('rmoss',x,h-.3,z,.8+r2()*1.6);else if(q<.5)scnVeg('rock',x,h-.3,z,.8+r2()*1.5);continue;}
-   if(q<.42)scnVeg('pine',x,h-.25,z,.7+r2()*.7);else if(q<.55)scnVeg('rmoss',x,h-.3,z,.7+r2()*1.6);else if(q<.66)scnVeg('fern',x,h-.25,z,.8+r2()*.5);else if(q<.74)scnVeg('rock',x,h-.3,z,.7+r2()*1.4);}
+ // ---- the Fangtooth Peaks: dark spruce valleys, scree, glaciers and turquoise glacial lakes
+ {const A=SCN.alps;scnClearVeg((x,z)=>A.lakes.some(L0=>Math.abs(x-L0.x)<L0.r*1.5&&Math.abs(z-L0.z)<L0.r*1.5&&scnLakeD(L0,x,z)<1.08));const r2=mulberry(6464);for(let t=0;t<16000;t++){const a=r2()*TAU,d=Math.sqrt(r2())*A.R*1.05;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<2)continue;const sl=Math.abs(heightAt(x+2,z)-h)+Math.abs(heightAt(x,z+2)-h);if(onWay(x,z,4))continue;const q=r2();
+   if(A.lakes.some(L0=>Math.hypot(x-L0.x,z-L0.z)<L0.r*1.45&&scnLakeD(L0,x,z)<1.12))continue;
+   if(sl>2.2){if(q<.1)scnVeg(h>140?'rsnow':'rock',x,h-.4,z,1+r2()*2.4);else if(q<.16&&h<100)scnVeg('rmoss',x,h-.4,z,1+r2()*1.8);continue;}
+   if(h>135){if(q<.07)scnVeg('rsnow',x,h-.3,z,.8+r2()*1.8);continue;}
+   if(h>104){if(q<.16)scnVeg('snowpine',x,h-.25,z,.6+r2()*.45);else if(q<.26)scnVeg('rock',x,h-.3,z,.7+r2()*1.6);continue;}
+   if(q<.7)scnVeg(h>88&&q<.25?'snowpine':'pine',x,h-.25,z,.85+r2()*.75,.5+r2()*.18);else if(q<.76)scnVeg('rmoss',x,h-.3,z,.7+r2()*1.6);else if(q<.82)scnVeg('fern',x,h-.25,z,.8+r2()*.5);else if(q<.86)scnVeg('rock',x,h-.3,z,.7+r2()*1.4);}
   const wm=new THREE.MeshStandardMaterial({color:0x3f8fa8,roughness:.06,metalness:.15,transparent:true,opacity:.86});
   for(const G of A.gorges){const pts=[];for(let i=0;i<G.length-1;i++)for(let k=0;k<6;k++){const u=k/6;pts.push({x:lerp(G[i].x,G[i+1].x,u),z:lerp(G[i].z,G[i+1].z,u)});}pts.push(G[G.length-1]);
    const hs=pts.map(q=>heightAt(q.x,q.z));if(hs[0]<hs[hs.length-1]){pts.reverse();hs.reverse();}let prev=1e9;const pos=[],idx=[];pts.forEach((q,i)=>{const nx=i<pts.length-1?pts[i+1].x-q.x:q.x-pts[i-1].x,nz=i<pts.length-1?pts[i+1].z-q.z:q.z-pts[i-1].z,l=Math.hypot(nx,nz)||1;let y=Math.min(prev,hs[i]+.35);if(y<.2)y=.2;prev=y;const w=4+3*Math.sin(i*.7);pos.push(q.x-nz/l*w,y,q.z+nx/l*w,q.x+nz/l*w,y,q.z-nx/l*w);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});
    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,wm));}
+  // glacial lakes: milky turquoise, shaped like their shores
+  const lm=new THREE.MeshLambertMaterial({color:0x22aebf,emissive:0x07343c,transparent:true,opacity:.95});
+  for(const L0 of A.lakes){const pos=[L0.x,L0.y,L0.z],idx=[];const NS=48;for(let k=0;k<=NS;k++){const a=k/NS*TAU;const rr0=L0.r*(1+.13*Math.sin(a*3+L0.ph)+.07*Math.sin(a*5-L0.ph))*1.12;pos.push(L0.x+Math.cos(a)*rr0,L0.y,L0.z+Math.sin(a)*rr0);if(k)idx.push(0,k+1,k);}
+   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,lm);m.receiveShadow=true;scene.add(m);
+   const rb=new VB(),r6=mulberry(Math.round(L0.x*3+L0.z));for(let k=0;k<26;k++){const a=r6()*TAU,rr0=L0.r*(1+.13*Math.sin(a*3+L0.ph)+.07*Math.sin(a*5-L0.ph))*(.98+r6()*.12);const x=L0.x+Math.cos(a)*rr0,z=L0.z+Math.sin(a)*rr0;const s0=.8+r6()*2.2;rb.add(r6()<.5?GB.dode:GB.ico0,r6()<.5?'#8d8a82':'#a39f95',TM(x,L0.y-.4,z,s0*1.3,s0*.7,s0,r6(),r6()*3,r6()),'#6f6c66');}
+   const rm=new THREE.Mesh(rb.geometry(),archMat);rm.castShadow=true;rm.receiveShadow=true;scene.add(rm);
+   LANDMARKS.push({name:L0.name,x:L0.x,z:L0.z,r:L0.r*1.3});}
   LANDMARKS.push({name:'the Fangtooth Peaks',x:A.x,z:A.z,r:A.R});}
  // ---- the Rimeshelf: no trees on the ice, a few pressure-ridge blocks
  {const I0=SCN.ice,b=I0.bb;const onIce=(x,z)=>x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&heightAt(x,z)>2.5&&heightAt(x,z)<14&&scnIceQ(x,z).d<scnIceW(scnIceQ(x,z).t,x,z);scnClearVeg(onIce);
@@ -1046,6 +1111,10 @@ function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND
  if(P.length)scnMesh(P,Cc,I);
  try{scnCoral();}catch(e){console.error(e);}
  try{scnOakInn();}catch(e){console.error(e);}
+ try{scnOakPads();}catch(e){console.error(e);}
+ try{scnMoss();}catch(e){console.error(e);}
+ try{scnCraterBuild();}catch(e){console.error(e);}
+ try{scnWonders();}catch(e){console.error(e);}
  // ---- Dunwhisker Castle on the southern Pinehallow sea cliffs
  {let best=null,bs=-1;for(let a=2.38;a<=2.86;a+=.01){let last=null;const hist=[];for(let r0=1500*WSC;r0<3300*WSC;r0+=8){const x=Math.cos(a)*r0,z=Math.sin(a)*r0;const h=heightAt(x,z);hist.push({x,z,h});if(hist.length>7)hist.shift();if(h<0){last=hist.reduce((m,q)=>q.h>m.h?q:m,hist[0]);if(last&&last.h>24){let sea=0;for(let k=0;k<16;k++){const q=k/16*TAU;if(heightAt(last.x+Math.cos(q)*55,last.z+Math.sin(q)*55)<0)sea++;}const sc=sea*10+last.h;if(sea>=3&&sea<=9&&sc>bs&&TOWNS.every(t=>Math.hypot(t.x-last.x,t.z-last.z)>t.r+120)&&!onWay(last.x,last.z,30)){bs=sc;best={x:last.x-Math.cos(a)*30,z:last.z-Math.sin(a)*30,a};}}break;}}}
   if(best){SCN.castle=best;scnCastle(best.x,best.z,best.a);LANDMARKS.push({name:'Dunwhisker Castle',x:best.x,z:best.z,r:60});}}}
@@ -1099,6 +1168,111 @@ function scnCoral(){const V=new VB(),r=mulberry(9191);const COL=['#ff7f6b','#ff9
  for(let i=0;i<3000;i++){const K0=SCN.karst;const a=r()*TAU,d=Math.sqrt(r())*K0.R;tryPatch(K0.x+Math.cos(a)*d,K0.z+Math.sin(a)*d);}
  for(let i=0;i<90000&&patches<1500;i++){const x=(r()-.5)*2*HALF*.9,z=(r()-.5)*2*HALF*.9;tryPatch(x,z);}
  if(!V.p.length)return;const m=new THREE.Mesh(V.geometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:0x111111}));m.receiveShadow=true;scene.add(m);SCN.coral=patches;}
+// ---- flowing river surface (shares the waterfall clock)
+let _rvm=null;function rvMat(){if(_rvm)return _rvm;_rvm=new THREE.ShaderMaterial({uniforms:Object.assign(THREE.UniformsUtils.clone(THREE.UniformsLib.fog),{uT:WFU.uT}),transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
+ vertexShader:`varying vec2 vU;
+#include <fog_pars_vertex>
+void main(){vU=uv;vec4 mvPosition=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mvPosition;
+#include <fog_vertex>
+}`,
+ fragmentShader:`uniform float uT;varying vec2 vU;
+#include <fog_pars_fragment>
+float h1(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h1(i),h1(i+vec2(1,0)),f.x),mix(h1(i+vec2(0,1)),h1(i+vec2(1,1)),f.x),f.y);}
+void main(){vec2 p=vec2(vU.x*4.,vU.y*1.3-uT*1.6);float s=n2(p)*.6+n2(p*vec2(2.3,1.7)+5.)*.4;float st=smoothstep(.58,.86,s);float edge=1.-smoothstep(.0,.22,min(vU.x,1.-vU.x));
+ vec3 c=mix(vec3(.1,.33,.38),vec3(.62,.82,.86),st*.6+edge*.35);gl_FragColor=vec4(c,.8+.12*st);
+#include <fog_fragment>
+}`});return _rvm;}
+// ---- pick sites for the new wonders (after roads exist, before the land is built)
+function scnClearOf(x,z,pad){if(TOWNS.some(t=>Math.hypot(t.x-x,t.z-z)<t.r+pad))return false;if(onWay(x,z,Math.min(pad,90)))return false;if(typeof wonderBlocked==='function'&&wonderBlocked(x,z,80))return false;
+ for(const L0 of LAKES)if(Math.hypot(L0.x-x,L0.z-z)<L0.r+80)return false;for(const D of DEEPWOODS)if(Math.hypot(D.x-x,D.z-z)<D.r+60)return false;
+ for(const q of[SCN.alps,SCN.high,SCN.spires,SCN.karst,SCN.atoll,SCN.crater])if(Math.hypot(q.x-x,q.z-z)<q.R+250)return false;
+ for(const q of SCN.ice.pts)if(Math.hypot(q.x-x,q.z-z)<SCN.ice.w0+250)return false;return true;}
+function scnCoast(a0,a1,rmin,ok){let best=null,bs=-1e9;for(let a=a0;a<=a1;a+=.006){const hist=[];for(let r0=rmin;r0<5200;r0+=7){const x=Math.cos(a)*r0,z=Math.sin(a)*r0;const h=rawHeight(x,z);hist.push({x,z,h});if(hist.length>9)hist.shift();if(h<0){let sea=true;for(const e of[60,160,320])if(rawHeight(Math.cos(a)*(r0+e),Math.sin(a)*(r0+e))>-1){sea=false;break;}if(!sea)continue;const top=hist.reduce((m,q)=>q.h>m.h?q:m,hist[0]);const sc=ok(top,a,hist);if(sc!==null&&sc>bs){bs=sc;best={x:top.x,z:top.z,h:top.h,ox:Math.cos(a),oz:Math.sin(a)};}break;}}}return best;}
+function scnWonderSites(){const W=SCN.wl;W.length=0;
+ // sea stacks off Tidecrest's cliffs
+ {const c=scnCoast(-.55,.75,1800,(t)=>t.h>9&&scnClearOf(t.x,t.z,380)?t.h:null);if(c)W.push({k:'stacks',name:'the Weeping Sisters',x:c.x+c.ox*90,z:c.z+c.oz*90,r:260,c});}
+ // a basalt causeway on Frosthold's north-eastern shore
+ {const c=scnCoast(-1.45,-.75,1300,(t,a,hs)=>{if(t.h<3||t.h>30||!scnClearOf(t.x,t.z,380))return null;const sl=Math.abs(hs[hs.length-2].h-hs[0].h);return 20-Math.abs(t.h-10)-sl*.2;});if(c)W.push({k:'causeway',name:'the Giants’ Stair',x:c.x+c.ox*12,z:c.z+c.oz*12,r:110,c,col:(x,z,h,sl,d)=>h>-.5&&d<95?lin(.22,.22,.24,1-smooth(70,95,d)):null});}
+ // white travertine terraces on a Verdantia–Tidecrest hillside
+ {const r=mulberry(4646);let best=null,bs=-1e9;for(let t=0;t<6000;t++){const a=-.2+r()*1.7,d=900+r()*1900;const x=Math.cos(a)*d,z=Math.sin(a)*d;const h=rawHeight(x,z);if(h<14||h>55)continue;
+   let gx=rawHeight(x+30,z)-rawHeight(x-30,z),gz=rawHeight(x,z+30)-rawHeight(x,z-30);const g=Math.hypot(gx,gz);if(g<7||g>26)continue;if(!scnClearOf(x,z,320))continue;const sc=-Math.abs(g-14)+r()*2;if(sc>bs){bs=sc;best={x,z,dx:-gx/g,dz:-gz/g};}}
+  if(best)W.push({k:'terraces',name:'the Whitestep Terraces',x:best.x,z:best.z,r:75,dx:best.dx,dz:best.dz,col:(x,z,h,sl,d)=>{const n=fbm(x*.08,z*.08,2);return lin(lerp(.88,.96,n),lerp(.86,.94,n),lerp(.8,.88,n),1-smooth(48,72,d));}});}
+ // red hoodoos in the badlands of the Wild East
+ {const r=mulberry(4848);let best=null,bs=-1;for(let t=0;t<5000;t++){const x=7400+r()*3200,z=-1550+r()*3100;const h=rawHeight(x,z);if(h<6||h>40)continue;if(!scnClearOf(x,z,420))continue;let ok=true;for(let k=0;k<8;k++){const a=k/8*TAU;if(rawHeight(x+Math.cos(a)*200,z+Math.sin(a)*200)<2){ok=false;break;}}if(!ok)continue;
+   let md=1e9;for(const q of TOWNS)md=Math.min(md,Math.hypot(q.x-x,q.z-z));if(md>bs){bs=md;best={x,z};}}
+  if(best)W.push({k:'hoodoos',name:'the Ember Hoodoos',x:best.x,z:best.z,r:240,col:(x,z,h,sl,d)=>{const b=Math.sin(h*.9+fbm(x*.02,z*.02,2)*3)*.5+.5;return lin(lerp(.7,.84,b),lerp(.42,.56,b),lerp(.3,.38,b),1-smooth(170,240,d));}});}
+}
+// ---- build the wonders
+function scnWonders(){const P=[],Cc=[],I=[];const LIME=['#cdb894','#a99272','#6f7f45','#7e6e57'],RED=['#b8582f','#e09a5c','#c9a27a','#7a3218'];
+ for(const w of SCN.wl){const r=mulberry(Math.round(Math.abs(w.x*7+w.z*3))%99991+11);
+  if(w.k==='stacks'){const c=w.c,lx=-c.oz,lz=c.ox;let n=0;for(let t=0;t<200&&n<13;t++){const o=40+r()*210,l=(r()-.5)*460;const x=c.x+c.ox*o+lx*l,z=c.z+c.oz*o+lz*l;const g=heightAt(x,z);if(g>-1.2||g<-22)continue;const rad=5+r()*9;if(w.list&&w.list.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+rad+6))continue;(w.list=w.list||[]).push({x,z,r:rad});
+    const H=26+r()*38;const tp=scnRock(P,Cc,I,x,g,z,rad,H-g,8100+n,LIME);addCol(x,z,rad*.9);for(let k=0;k<1+rad/5;k++)scnVeg(r()<.6?'fern':'jbush',x+(r()-.5)*rad*.7,tp.top-.3,z+(r()-.5)*rad*.7,.6+r()*.5);n++;}}
+  else if(w.k==='causeway'){const c=w.c,lx=-c.oz,lz=c.ox;const b=new VB();const sp=2.15;let n=0;for(let i=-26;i<=40;i++)for(let j=-18;j<=18;j++){const u=i*sp*.866,v=(j+(i&1)*.5)*sp;const hw=u<0?26:24*Math.sqrt(Math.max(0,1-Math.pow((u-6)/80,2)));if(Math.abs(v)>hw+(r()-.5)*4)continue;
+    const x=c.x+c.ox*u+lx*v,z=c.z+c.oz*u+lz*v;const g=heightAt(x,z);let top;if(u<-34)top=g+5+r()*9;else if(u<0)top=g+.8+Math.floor(r()*4)*.45;else{top=lerp(Math.max(c.h,1.5)+.6,-.4,u/78)+Math.floor(r()*4)*.4;if(g>top-.4)top=g+.5+r()*.6;}
+    if(top<-.9)continue;const base=Math.min(g,top)-5;const sh=r();b.add(GB.cyl6,sh<.3?'#2a2b2f':sh<.7?'#323439':'#3b3d42',TM(x,base,z,1.2,top-base,1.2,0,PI/6+(r()-.5)*.04,0),sh<.5?'#45484e':'#3e4146');if(u<-34)addCol(x,z,1.2);n++;}
+   const m=new THREE.Mesh(b.geometry(),archMat);m.castShadow=true;m.receiveShadow=true;scene.add(m);w.n=n;}
+  else if(w.k==='terraces'){const b=new VB(),wt=new VB();const lx=-w.dz,lz=w.dx;for(let row=-4;row<=5;row++){const np=3+(r()*3|0);for(let k=0;k<np;k++){const l=(k-(np-1)/2)*15+(r()-.5)*5,o=row*10+(r()-.5)*3;const x=w.x+w.dx*o+lx*l,z=w.z+w.dz*o+lz*l;const rad=5.5+r()*3;
+     let y=-1e9;for(let q=0;q<5;q++){const a=q/5*TAU;y=Math.max(y,heightAt(x+Math.cos(a)*rad*.6,z+Math.sin(a)*rad*.6));}y+=.25;const g=heightAt(x,z);
+     b.add(GB.cyl,'#efece4',TM(x,Math.min(g,y)-2.5,z,rad,y-Math.min(g,y)+2.5,rad*.82,0,Math.atan2(w.dx,w.dz),0),'#f7f5ef');
+     b.add(GB.cyl,'#e6e1d6',TM(x+w.dx*rad*.7,y-2.6,z+w.dz*rad*.7,rad*.7,2.7,rad*.35,0,Math.atan2(w.dx,w.dz),0),'#f4f1ea');
+     wt.add(GB.cyl,r()<.5?'#5fd2de':'#79dde6',TM(x,y-.08,z,rad*.86,.1,rad*.86*.82,0,Math.atan2(w.dx,w.dz),0));}}
+   const m=new THREE.Mesh(b.geometry(),archMat);m.receiveShadow=true;m.castShadow=true;scene.add(m);const wm=new THREE.Mesh(wt.geometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.08,metalness:.1,transparent:true,opacity:.92}));scene.add(wm);
+   const sm=new THREE.SpriteMaterial({map:glowTex,color:0xffffff,transparent:true,opacity:.18,depthWrite:false});for(let k=0;k<8;k++){const sp=new THREE.Sprite(sm);sp.position.set(w.x+(r()-.5)*60,heightAt(w.x,w.z)+6+r()*8,w.z+(r()-.5)*60);sp.scale.set(26,14,1);scene.add(sp);}}
+  else if(w.k==='hoodoos'){const b=new VB();let n=0;for(let t=0;t<900&&n<95;t++){const a=r()*TAU,d=Math.sqrt(r())*w.r*.78;const x=w.x+Math.cos(a)*d,z=w.z+Math.sin(a)*d;const g=heightAt(x,z);if(g<2||onWay(x,z,6))continue;const rad=1.6+r()*3;if((w.list=w.list||[]).some(q=>Math.hypot(q.x-x,q.z-z)<q.r+rad+1.5))continue;w.list.push({x,z,r:rad});
+    const H=(9+r()*20)*(1.1-.4*d/w.r);const tp=scnRock(P,Cc,I,x,g,z,rad,H,8600+n,RED,true);b.add(GB.dode,r()<.5?'#5a463a':'#6a5444',TM(x,tp.top-.2,z,rad*1.35,rad*.55,rad*1.25,r()*.2,r()*3,r()*.2));addCol(x,z,rad*.9);n++;}
+   const m=new THREE.Mesh(b.geometry(),archMat);m.castShadow=true;m.receiveShadow=true;scene.add(m);}
+  LANDMARKS.push({name:w.name,x:w.x,z:w.z,r:Math.min(w.r,140)});}
+ if(P.length)scnMesh(P,Cc,I);}
+// ---- Cinderbowl Isle and the Moonbowl
+function scnCraterBuild(){const V=SCN.crater;const r=mulberry(4545);
+ {const pos=[V.x,V.lake,V.z],idx=[];const NS=56;for(let k=0;k<=NS;k++){const a=k/NS*TAU;const rr0=V.Rc*(1+.06*Math.sin(a*5+1))*.83;pos.push(V.x+Math.cos(a)*rr0,V.lake,V.z+Math.sin(a)*rr0);if(k)idx.push(0,k+1,k);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0x1d5aa8,emissive:0x061a36,transparent:true,opacity:.95})));}
+ scnClearVeg((x,z)=>Math.hypot(x-V.x,z-V.z)<V.R);
+ for(let t=0;t<5000;t++){const a=r()*TAU,d=Math.sqrt(r())*V.R;const x=V.x+Math.cos(a)*d,z=V.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<2.5||(d<V.Rc*.9&&h<V.lake+1))continue;const sl=Math.abs(heightAt(x+2,z)-h)+Math.abs(heightAt(x,z+2)-h);const q=r();
+  if(sl>2.6){if(q<.12)scnVeg('rock',x,h-.4,z,1+r()*2);continue;}if(h>V.rim-6){if(q<.08)scnVeg('rock',x,h-.3,z,.7+r()*1.4);continue;}
+  if(q<.5)scnVeg('pine',x,h-.25,z,.7+r()*.6,.55+r()*.2);else if(q<.6)scnVeg('fern',x,h-.25,z,.8+r()*.5);else if(q<.66)scnVeg('rmoss',x,h-.3,z,.7+r()*1.2);}
+ LANDMARKS.push({name:'Cinderbowl Isle',x:V.x,z:V.z,r:V.R*.8});LANDMARKS.push({name:'the Moonbowl',x:V.x,z:V.z,r:V.Rc*.8});}
+// ---- the Mossgloom: an ancient rainforest of giant mossy trees, glowing fungi and low mist
+function scnMoss(){const Z=scnMossZ();if(!Z)return;const r=mulberry(4747);const b=new VB(),gm=new VB();const trees=[];
+ for(let t=0;t<6000&&trees.length<85;t++){const a=r()*TAU,d=Math.sqrt(r())*Z.r*.95;const x=Z.x+Math.cos(a)*d,z=Z.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<2.2)continue;if(onWay(x,z,9)||nearFlat(x,z,12)||structNear(x,z,6))continue;if(trees.some(q=>Math.hypot(q.x-x,q.z-z)<19))continue;
+  if(Math.abs(heightAt(x+4,z)-h)+Math.abs(heightAt(x,z+4)-h)>3)continue;trees.push({x,z,h});}
+ const vt=(x,z)=>trees.some(q=>Math.abs(q.x-x)<7&&Math.abs(q.z-z)<7);scnClearVeg((x,z)=>Math.abs(x-Z.x)<Z.r&&Math.abs(z-Z.z)<Z.r&&vt(x,z));
+ const LEAF=['#1c4519','#21521d','#183c16','#2a5b20','#305f24'];
+ for(const T of trees){const{x,z,h}=T;const H=27+r()*17,R0=1.7+r()*1.2,lx=(r()-.5)*.08,lz=(r()-.5)*.08;
+  b.add(GB.tcyl,'#4b4434',TM(x,h-1.2,z,R0,H*.55,R0,lx,r()*3,lz),'#3e5228');b.add(GB.tcyl,'#433f2f',TM(x+lx*H*.55,h-1.2+H*.53,z-lz*H*.55,R0*.68,H*.42,R0*.68,lx,0,lz),'#4a5a2c');
+  for(let k=0;k<6;k++){const a=k/6*TAU+r()*.5;const L0=R0*1.6+r()*1.8;b.add(GB.box,k%2?'#3f4a28':'#475330',TM(x+Math.cos(a)*R0*.55,h-.9,z+Math.sin(a)*R0*.55,.55,1.6+r()*1.6,L0,-.18,PI/2-a,0),'#2f4a1e');}
+  for(let k=0;k<4;k++){const a=r()*TAU;b.add(GB.sphs,'#3f6a24',TM(x+Math.cos(a)*R0*.95,h+.3+r()*3,z+Math.sin(a)*R0*.95,.9+r()*.6,.6+r()*.5,.9+r()*.6));}
+  const nb=8+(r()*4|0);for(let k=0;k<nb;k++){const a=k/nb*TAU+r()*.6,o=3+r()*9,yy=h+H*(.55+r()*.42);const bx=x+Math.cos(a)*o,bz=z+Math.sin(a)*o;const s0=6.5+r()*5.5;
+   b.add(GB.cyl,'#4a4232',TM(x,yy-6,z,.45,o*1.15,.45,PI/2-.5,PI/2-a,0));b.add(GB.ico0,LEAF[(r()*LEAF.length)|0],TM(bx,yy,bz,s0,s0*.55,s0,r(),r()*3,r()),'#10280e');
+   for(let m=0;m<3;m++)b.add(GB.cone8,'#93b062',TM(bx+(r()-.5)*s0,yy-s0*.35,bz+(r()-.5)*s0,.35,3+r()*4,.35,PI,0,0));}
+  addCol(x,z,R0*1.05);}
+ for(let k=0;k<26;k++){const a=r()*TAU,d=Math.sqrt(r())*Z.r*.9;const x=Z.x+Math.cos(a)*d,z=Z.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<2||onWay(x,z,6)||nearFlat(x,z,6))continue;const L0=10+r()*12,ry=r()*TAU,R1=.9+r()*.7;
+  b.add(GB.cylc,'#4a4634',TM(x,h+R1*.6,z,R1,L0,R1,0,ry,PI/2));for(let m=0;m<5;m++){const u=(m/4-.5)*L0;b.add(GB.sphs,'#35561e',TM(x-Math.cos(ry)*u,h+R1*1.3,z+Math.sin(ry)*u,R1*.9,R1*.45,R1*.9));}for(let m=0;m<3;m++)scnVeg('mush',x+(r()-.5)*L0*.6,h,z+(r()-.5)*L0*.6,.7+r()*.6);}
+ const m=new THREE.Mesh(b.geometry(),archMat);m.castShadow=true;m.receiveShadow=true;scene.add(m);
+ // glowing toadstools, mossy boulders and ferns on the forest floor
+ let glows=0;for(let t=0;t<900;t++){const a=r()*TAU,d=Math.sqrt(r())*Z.r;const x=Z.x+Math.cos(a)*d,z=Z.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<2||onWay(x,z,3)||nearFlat(x,z,4))continue;
+  if(t%3===0){const nm=3+(r()*5|0);const col=r()<.6?'#7ff7e2':'#b6ff7a';for(let k=0;k<nm;k++){const px=x+(r()-.5)*2.4,pz=z+(r()-.5)*2.4,py=heightAt(px,pz),s0=.25+r()*.45;gm.add(GB.cyl,'#e8f2e0',TM(px,py-.1,pz,s0*.22,s0*1.6,s0*.22));gm.add(GB.hemi,col,TM(px,py+s0*1.45,pz,s0,s0*.6,s0));}
+   if(glows<70){addGlow(x,h+.8,z,3.2,col==='#7ff7e2'?0x55ffd8:0x9dff66);glows++;}}
+  else if(t%3===1)scnVeg('rmoss',x,h-.4,z,1.2+r()*2.6);else{for(let k=0;k<4;k++)scnVeg('fern',x+(r()-.5)*5,h-.25,z+(r()-.5)*5,1+r()*.7);}}
+ if(gm.p.length)scene.add(new THREE.Mesh(gm.geometry(),new THREE.MeshBasicMaterial({vertexColors:true})));
+ // fireflies at dusk, and mist lying in the hollows
+ for(let k=0;k<60;k++){const a=r()*TAU,d=Math.sqrt(r())*Z.r;const x=Z.x+Math.cos(a)*d,z=Z.z+Math.sin(a)*d;addGlow(x,heightAt(x,z)+1+r()*3,z,.9,0xd8ff70,'lamp');}
+ const mm=new THREE.SpriteMaterial({map:glowTex,color:0xd9ecd6,transparent:true,opacity:.2,depthWrite:false});for(let k=0;k<34;k++){const a=r()*TAU,d=Math.sqrt(r())*Z.r*.9;const x=Z.x+Math.cos(a)*d,z=Z.z+Math.sin(a)*d;const sp=new THREE.Sprite(mm);sp.position.set(x,heightAt(x,z)+3+r()*3,z);sp.scale.set(55+r()*30,12+r()*6,1);scene.add(sp);}
+ SCN.mossTrees=trees.length;}
+// ---- Oakcross balloon pads: two small landing stages on opposite sides of town
+function scnPad(b,x,z,ki){const y=heightAt(x,z);b.add(GB.cyl,'#6e5236',TM(x,y-1.2,z,4.6,1.65,4.6),'#4a3420');b.add(GB.cyl,'#9a7a4c',TM(x,y+.42,z,4.66,.08,4.66));for(let i=0;i<8;i++){const a=i/8*TAU;b.add(GB.cyl,'#4a3624',TM(x+Math.cos(a)*4.4,y-.5,z+Math.sin(a)*4.4,.13,1.5,.13));}
+ const mx=x+3.4,mz=z+3.4;b.add(GB.cyl,'#5a4028',TM(mx,y,mz,.22,9,.22));b.add(GB.box,'#7a5a38',TM(mx,y+9,mz,1.3,.2,1.3));b.add(GB.cyl,'#2a2018',TM(mx,y+9.2,mz,.3,.5,.3));addGlow(mx,y+9.8,mz,3,0xffc070,'lamp');addCol(mx,mz,.5);
+ for(let i=0;i<2;i++)b.add(GB.box,'#8a6a40',TM(x-3.2+i*1.2,y+.5,z-2.6,1,1,1,0,i*.5,0));addFlag(b,x-3.3,y+6,z+2.8,0,ki,5);
+ PLATS.push({circle:true,x,z,r:4.6,y:y+.5});const bl=makeBalloon(ki);bl.position.set(x,y+.5,z);scene.add(bl);return{x,z,y:y+.5,ki,docked:bl};}
+function scnOakPads(){const keep=rng;rng=mulberry(9393);try{scnOakPads0();}finally{rng=keep;}}
+function scnOnIce(x,z){const I=SCN.ice,b=I.bb;if(!(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]))return false;const q=scnIceQ(x,z);return q.d<scnIceW(q.t,x,z)+14&&heightAt(x,z)<16;}
+function scnOakPads0(){const t=TOWNS.find(q=>q.name==='Oakcross'&&q.remote);if(!t||t.pads)return;const b=new VB(),wb=new VB();t.pads=[];
+ {CURTOWN=t;try{houseRing(t,b,wb,14,46,80,11,[],(a,r,p)=>{const h=heightAt(p.x,p.z);return h<2||scnOnIce(p.x,p.z)||structNear(p.x,p.z,7.5)||onWay(p.x,p.z,5)||Math.abs(heightAt(p.x+7,p.z)-h)>2.2||Math.abs(heightAt(p.x,p.z+7)-h)>2.2;});}finally{CURTOWN=null;}
+  if(wb.p.length)scene.add(new THREE.Mesh(wb.geometry(),winMat));}
+ for(let i=0;i<720&&t.pads.length<2;i++){const a=(t.ga||0)+PI*.5+i*.61,r=t.r+12+(i%9)*5;const x=t.x+Math.cos(a)*r,z=t.z+Math.sin(a)*r;const h=heightAt(x,z);if(h<2||h>60)continue;
+  if(t.pads.some(p=>Math.abs(wrapA(p.a-a))<1.9))continue;let ok=true;for(let k=0;k<8&&ok;k++){const q=k/8*TAU;if(Math.abs(heightAt(x+Math.cos(q)*6,z+Math.sin(q)*6)-h)>1.3)ok=false;}if(!ok||structNear(x,z,8)||onWay(x,z,6))continue;
+  const st=scnPad(b,x,z,t.k);st.town=t;STATIONS.push(st);t.pads.push({x,z,a});const fa=Math.atan2(t.z-z,t.x-x);townNPC(t,'balloonist',x+Math.cos(fa)*6.2,z+Math.sin(fa)*6.2,{yaw:Math.atan2(x-(x+Math.cos(fa)*6.2),z-(z+Math.sin(fa)*6.2))});}
+ const m=new THREE.Mesh(b.geometry(),archMat);m.castShadow=true;m.receiveShadow=true;scene.add(m);flushHouses();}
 
 // ================= TERRAIN =================
 let mapImg=null,heightTex=null;
@@ -1152,7 +1326,8 @@ function buildTerrain(){
   float a1=texture2D(uDet,vWP.xz*.085).r,a2=texture2D(uDet,vWP.xz*.0105).r,a3=texture2D(uDet,vWP.xz*.43).r;
   float st=texture2D(uDet,vec2((vWP.x+vWP.z)*.045,vWP.y*.32)).r;
   float dd=mix(a1*.55+a2*.45,st,smoothstep(.16,.42,sl));dd=dd*(.78+.44*a3);
-  diffuseColor.rgb*=.58+.84*dd;`);};
+  diffuseColor.rgb*=.58+.84*dd;
+  diffuseColor.rgb*=mix(1.,.8+.34*(.5+.5*sin(vWP.y*.6+a2*6.)),smoothstep(.34,.6,sl));`);};
  mat.customProgramCacheKey=()=>'terrain';
  const mesh=new THREE.Mesh(geo,mat);mesh.receiveShadow=true;scene.add(mesh);
  const cv=document.createElement('canvas');cv.width=N;cv.height=N;const cx=cv.getContext('2d');const id=cx.createImageData(N,N);id.data.set(img);cx.putImageData(id,0,0);
@@ -1960,7 +2135,7 @@ function townCommon(t,b,wb,at,face,spots){
   addFlag(b,p.x+Math.sin(face(p))*6+Math.cos(face(p))*3,heightAt(p.x,p.z)+4.5,p.z+Math.cos(face(p))*6-Math.sin(face(p))*3,face(p)+PI/2,ki,4);}
  (spots.stalls||[]).forEach((p,i)=>{stall(b,p.x,p.z,face(p),i%2?kc.trim:kc.coat);if(i<2||t.type!=='capital'||i===2)townNPC(t,'merchant',p.x-Math.sin(face(p))*1.2,p.z-Math.cos(face(p))*1.2,{yaw:face(p)});});
  if(spots.board){jobBoard(b,spots.board.x,spots.board.z,face(spots.board));t.board=spots.board;}
- if(spots.sta){const p=spots.sta;const st=balloonStation(b,p.x,p.z,ki);st.town=t;STATIONS.push(st);const a=Math.atan2(p.z-t.z,p.x-t.x);townNPC(t,'balloonist',p.x-Math.cos(a)*6.2,p.z-Math.sin(a)*6.2,{yaw:face(p)+PI});}}
+ if(spots.sta&&!t.remote){const p=spots.sta;const st=balloonStation(b,p.x,p.z,ki);st.town=t;STATIONS.push(st);const a=Math.atan2(p.z-t.z,p.x-t.x);townNPC(t,'balloonist',p.x-Math.cos(a)*6.2,p.z-Math.sin(a)*6.2,{yaw:face(p)+PI});}}
 function houseRing(t,b,wb,n,r0,r1,minD,used,avoid,opt){let made=0,tries=0;const face=p=>Math.atan2(t.x-p.x,t.z-p.z);
  while(made<n&&tries<n*30){tries++;const a=rng()*TAU,r=R(r0,r1);const p={x:t.x+Math.cos(a)*r,z:t.z+Math.sin(a)*r};if(avoid&&avoid(a,r,p))continue;if(used.some(u=>Math.hypot(u.x-p.x,u.z-p.z)<(u.d||minD)))continue;if(heightAt(p.x,p.z)<1.2)continue;
   used.push(p);const o=opt?opt(r):{};if(rng()<.45){o.door='house';o.town=t;}house(b,wb,p.x,p.z,face(p)+R(-.15,.15),t.k,o);made++;}}
@@ -2565,7 +2740,7 @@ function talkRecruiter(n){const ki=n.k,k=K[ki];
  opts.push({label:'Resign commission',fn:()=>{openPanel(n.title,'Resign?','“Hand back your colours? You’ll keep the musket, but your rank and merit are gone for good.”',[{label:'Yes, resign',fn:()=>{P.army=-1;P.rank=0;P.merit=0;if(P.mission&&P.mission.k!==undefined)P.mission=null;outfit();toast('You resign your commission.');closePanel();save();}},{label:'Stay in service',primary:true,fn:()=>talkRecruiter(n)}]);}});
  const next=P.rank<WARRANT_R?RANKS[P.rank+1]:null;openPanel(n.title,k.realm,`“At ease, ${RANKS[P.rank].n} ${esc(P.name)}.”<br>Corps: <b>${CORPS[corpsNow()].n}</b> · Merit: <b>${P.merit}</b>${next?` · next rank (${next.n}) at ${next.m}`:P.rank<RANKS.length-1?' · higher ranks are appointed by the realm’s admins':' · the highest rank in the land'}. Daily wages: ${6+P.rank*6} gold.${m?`<br>Current task: <b>${esc(m.title)}</b>`:''}`,opts);}
 function talkBalloonist(n){const st=STATIONS.find(s=>Math.hypot(s.x-n.pos.x,s.z-n.pos.z)<14);if(!st)return;const opts=[];
- const dests=STATIONS.filter(s=>s!==st).map(s=>({s,d:Math.hypot(s.x-st.x,s.z-st.z)})).sort((a,b)=>a.d-b.d);
+ const dests=STATIONS.filter(s=>s!==st&&s.town!==st.town).map(s=>({s,d:Math.hypot(s.x-st.x,s.z-st.z)})).sort((a,b)=>a.d-b.d);
  const free=(P.army>=0&&P.rank>=OFFICER_R)||P.ruler>=0;
  dests.forEach(o=>{const cost=free?0:Math.round(8+o.d*.025);opts.push({label:`${o.s.town.name} (${cost?cost+' gold':'free'})`,disabled:P.gold<cost,fn:()=>{P.gold-=cost;closePanel();startTravel(st,o.s);}});});
  opts.push({label:`Charter a balloon and fly it yourself (${free?'free':'30 gold'})`,primary:true,disabled:!free&&P.gold<30,fn:()=>{if(!free)P.gold-=30;closePanel();startPilot(st);}});
@@ -6707,7 +6882,7 @@ function ppRender(){const w=renderer.domElement.width,h=renderer.domElement.heig
 const OLDHOUSE=[3,-59,-1949,4,-32,-1976,5,62,-2007,6,-44,-1822,7,58,-1994,8,-59,-1850,9,-59,-1822,10,-113,-1944,11,56,-1816,12,68,-1898,13,47,-1826,14,-18,-2054,15,87,-1947,16,77,-1872,17,35,-1849,18,-87,-1949,19,25,-1814,20,-44,-1953,21,-38,-1790,22,15,-2002,23,-22,-1792,24,-44,-1867,25,-58,-1931,26,62,-1870,27,37,-1994,28,74,-1855,29,45,-1806,30,122,-1958,31,98,-1960,32,77,-1908,33,-82,-1813,34,89,-1998,35,-51,-2019,36,-29,-1864,37,108,-1863,38,11,-1983,39,92,-1819,40,-79,-1856,41,-60,-1965,42,-68,-2008,43,45,-1888,44,-68,-1834,45,80,-1981,46,-50,-1900,47,-32,-2050,48,52,-2043,49,-91,-1848,50,-95,-1937,51,-20,-1836,52,125,-1970,53,114,-1992,54,32,-1864,62,-3068,354,63,-3469,858,64,-3773,180,65,-3244,335,66,-3261,170,67,-3529,232,68,-3228,228,69,-3914,485,70,-3212,286,71,-3787,162,72,-3547,328,73,-3529,689,74,-3533,272,75,-2988,380,76,-3115,204,77,-3243,266,78,-3557,660,79,-3406,660,80,-3622,325,81,-4003,600,82,-3513,630,83,-3397,354,84,-3097,215,85,-3503,229,86,-3740,245,87,-3005,315,88,-3000,395,89,-2957,485,90,-3224,827,91,-3143,186,92,-3154,671,93,-3449,813,94,-3110,647,95,-4004,615,96,-3338,787,97,-3726,655,98,-3214,177,99,-3783,209,100,-3274,343,101,-4004,637,102,-3262,154,103,-3254,313,104,-3768,276,105,-3035,284,106,-3026,358,107,-3223,294,108,-3036,405,109,-3032,389,110,-3608,230,111,-3816,490,112,-3492,267,113,-3844,587,114,-3170,259,115,-3242,210,116,-3694,525,117,-3072,323,118,-3512,216,119,-3154,358,120,-3739,189,121,-3459,827,122,-3390,344,123,-3402,754,124,-3162,648,125,-3185,266,126,-3524,593,127,-3258,138,128,-3403,724,129,-3619,245,130,-3130,259,131,-3209,191,132,-3101,295,133,-3630,332,134,-2990,341,135,-3949,557,136,-4009,624,137,-3522,250,138,-3684,508,139,-3187,356,140,-3235,138,141,-3238,300,142,-3600,212,143,-3567,528,144,-3184,180,145,-3540,892,146,-3465,874,147,-3746,302,148,-3048,258,149,-3205,471,150,-3495,540,151,-3109,348,152,-3441,650,153,-3056,386,154,-3835,578,155,-3584,628,156,-3711,649,157,-3006,362,158,-3197,225,159,-3965,507,160,-3974,515,161,-3517,730,162,-3993,553,163,-3480,285,164,-3100,364,165,-3212,360,166,-3210,657,167,-4005,583,168,-3240,384,169,-3436,797,170,-3640,234,171,-3278,312,172,-3949,573,173,-2998,331,174,-4020,628,175,-3634,185,176,-3325,168,177,-3592,218,178,-3282,328,179,-3513,505,180,-3628,211,181,-3397,587,182,-3259,325,183,-3653,725,184,-3321,816,185,-3172,295,186,-3505,637,187,-3397,282,188,-3594,257,189,-3822,518,190,-3084,238,191,-3147,286,192,-3480,294,193,-3155,277,194,-3708,621,195,-3202,255,196,-3546,634,197,-3095,319,198,-3348,849,199,-3174,309,200,-3413,795,201,-3409,519,202,-3568,878,203,-3509,516,204,-3626,226,205,-3210,216,206,-3153,190,207,-3445,847,208,-3838,513,209,-3229,276,210,-3449,879,211,-3628,316,212,-3089,265,213,-3029,303,214,-3905,489,215,-3820,589,216,-3978,489,217,-3339,772,218,-3163,221,219,-3129,339,223,-45,1639,224,48,1636,225,84,1725,226,15,1792,227,-14,1781,228,-57,1617,229,-36,1765,230,93,1740,231,-79,1664,232,8,1745,233,77,1570,234,109,1695,235,86,1594,236,51,1751,237,80,1781,238,-128,1712,239,-35,1803,240,-131,1650,241,-57,1603,242,-77,1790,243,39,1801,244,-58,1660,245,63,1658,246,90,1698,247,-35,1579,248,-101,1660,249,80,1739,250,-21,1815,251,45,1722,252,72,1759,253,-45,1786,254,78,1618,255,-107,1710,256,95,1778,257,-83,1610,258,46,1574,259,122,1632,260,-79,1636,261,34,1636,262,-19,1770,263,-34,1748,264,-117,1748,265,-113,1650,266,56,1671,267,56,1798,268,-26,1783,269,111,1759,270,-55,1762,271,56,1722,272,-102,1747,273,92,1608,274,-109,1611,275,-90,1712,276,45,1734,277,102,1718,278,-13,1575,282,3055,-26,283,2940,-34,284,2996,60,285,2999,-102,286,3050,114,287,3009,86,288,2915,108,289,3106,-21,290,2899,-74,291,3079,-76,292,2861,44,293,2911,36,294,3041,-96,295,3003,-130,296,3069,-44,297,2915,87,298,3026,108,299,2920,-94,300,3060,67,301,3031,24,302,3086,42,303,2890,23,304,2925,-45,305,2875,74,306,3048,37,307,2928,64,308,3060,-95,309,2996,-64,310,2957,-118,311,2954,89,312,2892,-38,313,3031,95,314,2928,-111,315,3057,-78,316,2924,-72,317,3075,74,318,3082,-92,319,2868,-25,320,3056,25,321,2860,-48,322,3025,-126,323,2965,-78,324,3069,13,325,2877,-37,326,3000,98,327,3033,-50,328,2971,58,329,2890,-56,330,2943,114,331,2966,104,332,3012,68,335,-15,94,336,-39,89,337,-103,-45,338,94,-64,339,-20,-90,340,24,-104,341,-90,46,342,-105,46,343,40,-80,344,-91,-5,345,92,9,346,-11,-102,347,103,-38,348,2,110,350,1404,-5024,351,1393,-5017,352,1370,-4970,353,1372,-4980,354,1404,-4976,355,-1622,-4950,356,-1597,-4929,357,-1605,-4956,358,-1604,-4943,359,3108,-4341,360,3123,-4320,362,-5141,-1410,363,-5196,-1391,364,-5185,-1407,365,-5132,-1392,366,-5006,1497,367,-5004,1506,368,-4011,-3652,370,-1684,5074,371,-1695,5038,372,-1641,5066,373,-1682,5032,374,-1650,5026,375,1619,4939,376,1613,4944,377,1622,4949,378,1600,4924,379,1600,4941,380,3537,4229,381,3537,4213,382,3568,4217,383,3537,4222,385,5049,1696,386,5029,1665,387,5080,1669,388,6159,100,389,6154,121,390,6174,120,391,6165,130,392,5865,3005,393,5888,2978,394,5564,-3453,395,5554,-3446,397,4900,-1571,398,4907,-1678,399,4923,-1599,400,4897,-1528,401,4882,-1570,402,4865,-1557,403,4914,-1575,404,4829,-1674,405,4861,-1630,406,4937,-1558,407,4940,-1611,408,4913,-1588,409,4806,-1611,410,4893,-1550,411,4916,-1560,412,4811,-1566,413,4858,-1530,414,4919,-1626,415,4885,-1675,416,4886,-1653,417,4920,-1642,418,4932,-1651,419,4836,-1539,420,4953,-1600,421,4918,-1660,422,4882,-1531,423,4826,-1637,424,4855,-1679,425,4828,-1579,426,4934,-1673,427,4916,-1613,428,4916,-1526,430,-272,-1794,431,-298,-1831,432,-269,-1747,433,-344,-1814,434,-313,-1808,435,-263,-1734,436,-261,-1762,437,-249,-1684,438,-253,-1750,439,-349,-1723,440,-235,-1772,441,-269,-1781,442,-266,-1691,443,-391,-1713,444,-365,-1793,445,-373,-1762,446,-378,-1799,447,-275,-1671,448,-239,-1721,449,-359,-1725,450,-391,-1769,451,-348,-1694,452,-334,-1728,453,-329,-1676,454,-351,-1679,455,-246,-1734,456,-395,-1755,457,-341,-1798,458,571,-1417,459,596,-1405,460,578,-1434,461,590,-1415,462,575,-1425,463,492,-743,464,484,-720,465,506,-744,466,500,-721,467,484,-751,468,-1182,-2523,469,-1166,-2528,470,-1161,-2534,471,-1165,-2548,473,354,-1986,474,341,-1962,475,351,-1994,476,364,-1963,477,342,-1987,478,359,-1949,480,1186,-4797,481,1199,-4854,482,1133,-4738,483,1238,-4768,484,1164,-4810,485,1188,-4744,486,1223,-4740,487,1189,-4695,488,1119,-4712,489,1116,-4834,490,1196,-4776,491,1224,-4781,492,1200,-4792,493,1241,-4818,494,1180,-4732,495,1219,-4821,496,1129,-4852,497,1159,-4709,498,1123,-4786,499,1215,-4701,500,1139,-4721,501,1238,-4790,502,1132,-4778,503,1115,-4777,504,1157,-4860,505,1141,-4836,506,1205,-4834,507,-831,-2721,508,-840,-2713,509,-816,-2708,510,-852,-2715,511,-442,-2443,512,-445,-2436,513,1444,-2357,514,1443,-2367,516,922,-1297,517,958,-1319,518,915,-1316,519,922,-1334,521,-1503,145,522,-1397,105,523,-1389,261,524,-1353,152,525,-1431,216,526,-1456,196,527,-1465,183,528,-1401,260,529,-1386,198,530,-1397,137,531,-1400,234,532,-1467,257,533,-1361,238,534,-1416,156,535,-1375,158,536,-1492,242,537,-1401,220,538,-1443,126,539,-1374,195,540,-1362,134,541,-1380,126,542,-1452,136,543,-1409,135,544,-1444,249,545,-1435,236,546,-1388,244,547,-1343,160,548,-1490,176,549,-1589,424,550,-1578,426,551,-1557,436,552,-1572,410,553,-1554,421,554,-1046,82,555,-1038,87,556,-1748,1816,557,-1762,1839,558,-1751,1824,559,-1767,1826,560,-1776,1833,562,-2618,347,563,-2639,364,564,-2644,309,565,-2641,334,566,-2626,344,568,-5409,-1586,569,-5359,-1632,570,-5401,-1656,571,-5425,-1598,572,-5430,-1562,573,-5332,-1660,574,-5348,-1630,575,-5401,-1680,576,-5421,-1549,577,-5315,-1559,578,-5366,-1640,579,-5301,-1636,580,-5347,-1546,581,-5351,-1685,582,-5450,-1585,583,-5386,-1656,584,-5463,-1576,585,-5430,-1671,586,-5319,-1667,587,-5425,-1684,588,-5436,-1608,589,-5338,-1641,590,-5388,-1535,591,-5373,-1535,592,-5415,-1612,593,-5437,-1549,594,-5324,-1637,595,-1776,89,596,-1756,78,597,-1764,79,598,-1767,67,599,-2911,593,600,-2887,594,601,-2905,611,602,-2917,600,603,-2676,-1211,604,-2687,-1222,605,-2660,-1217,607,-1999,-2120,608,-2005,-2104,609,-2004,-2083,610,-1984,-2118,611,-2010,-2071,612,-1977,-2067,613,-1985,-2078,615,-748,2359,616,-690,2344,617,-856,2351,618,-832,2403,619,-760,2423,620,-709,2298,621,-770,2378,622,-840,2363,623,-741,2291,624,-844,2288,625,-832,2273,626,-734,2401,627,-714,2286,628,-787,2304,629,-755,2372,630,-735,2341,631,-817,2306,632,-809,2266,633,-818,2396,634,-803,2317,635,-764,2396,636,-784,2376,637,-795,2282,638,-850,2330,639,-814,2326,640,-772,2294,641,-725,2331,642,-721,2358,643,-699,2378,644,-809,2341,645,-701,2309,646,197,2516,647,196,2530,648,196,2538,649,215,2518,650,775,1449,651,764,1466,652,755,1459,653,693,1929,654,719,1937,656,1726,1593,657,1757,1572,659,-1477,5373,660,-1470,5299,661,-1595,5343,662,-1539,5289,663,-1455,5361,664,-1506,5359,665,-1456,5334,666,-1498,5285,667,-1454,5320,668,-1494,5317,669,-1603,5328,670,-1561,5262,671,-1483,5348,672,-1532,5276,673,-1541,5307,674,-1532,5387,675,-1561,5368,676,-1555,5312,677,-1583,5269,678,-1576,5406,679,-1482,5336,680,-1443,5334,681,-1596,5375,682,-1580,5390,683,-1497,5341,684,-1594,5280,685,-1551,5379,686,-1594,5316,687,-1472,5322,688,-1522,5246,689,-1580,5342,690,-1524,5286,691,-1493,5362,692,-1545,2636,693,-1568,2647,694,-1577,2646,695,-1554,2647,696,-1556,2630,697,-1567,2635,698,-54,3068,699,-59,3078,700,-469,2135,701,-432,2137,702,-445,2141,704,316,1566,705,301,1602,706,301,1550,707,2428,807,708,2418,832,709,2026,651,710,2021,667,711,2004,665,713,2584,-569,714,2530,-532,715,2540,-534,716,2565,-523,717,2521,-560,718,2531,-552,719,2550,-581,721,5140,1923,722,5179,1910,723,5123,1893,724,5100,1914,725,5130,1933,726,5201,1978,727,5115,1998,728,5161,2035,729,5229,1955,730,5111,1965,731,5194,1899,732,5173,1876,733,5141,1983,734,5208,1930,735,5138,1913,736,5195,1935,737,5092,1960,738,5157,2010,739,5165,1987,740,5210,1947,741,5140,1879,742,5167,1915,743,5106,1977,744,5244,1914,745,5120,2024,746,5115,2013,747,2327,-1469,748,2351,-1455,749,2328,-1456,750,1431,-1414,751,1416,-1390,752,1439,-1409,753,1406,-1405,754,1432,-1403,755,1441,-1393,756,2944,-442,757,2919,-443,758,2934,-455,759,2939,-432,760,2950,-449,762,1943,1196,763,1887,1176,764,1934,1162,765,1917,1175,766,1899,1164,768,-7573,7900,769,-7558,7930,770,-7575,7950,771,-7536,7871,772,-7590,7881,773,-7496,7957,774,-7438,7907,775,-7524,7961,776,-7568,7887,777,-7581,7967,778,-7470,7941,779,-7472,7992,780,-7603,7939,781,-7561,7915,782,-7576,7920,783,-7590,7900,784,-7497,8006,785,-7511,7855,786,-7547,7868,787,-7579,7860,788,-7604,7904,789,-7435,7947,790,-7486,7936,791,-7526,8013,792,-7596,7959,793,-7448,7895,795,-7165,7106,796,-7180,7134,797,-7150,7149,798,-7166,7129,799,-7155,7129,800,-7269,7885,801,-7297,7891,802,-7277,7891,803,-7093,7548,804,-7064,7553,805,-7079,7539,806,-7976,7587,807,-7959,7596,808,-7969,7603,809,-7832,7826,810,-7846,7822,811,-7823,7814,812,-7849,7812,813,-2251,-1343,815,6596,-5898,816,6495,-5860,817,6648,-5835,818,6542,-5797,819,6578,-5893,820,6594,-5776,821,6579,-5784,822,6568,-5821,823,6589,-5816,824,6623,-5880,825,6619,-5790,826,6564,-5910,827,6502,-5844,828,6521,-5912,829,6635,-5796,830,6536,-5917,831,6564,-5793,832,6548,-5902,833,6544,-5861,834,6607,-5818,835,6610,-5833,836,6594,-5832,837,6618,-5849,838,6628,-5825,839,6512,-5889,840,6650,-5870,841,6636,-5858,842,6537,-5896,843,6545,-5783,844,6640,-5826,845,6618,-5910,846,6546,-5932,847,6583,-5911,848,6578,-5943,849,6637,-5891,850,6552,-5917,851,6518,-5864,852,6508,-5905,853,6554,-5821,854,6676,-6195,855,6703,-6182,856,6691,-6197,857,6683,-6206,858,6472,-6054,859,6465,-6041,860,6493,-6022,861,6494,-5505,862,6501,-5501,864,7382,549,865,7379,568,866,7365,555,867,7345,522,868,7360,527,869,9141,1089,870,9145,1098,871,9141,1073,872,9169,1075,873,9135,1079,874,9304,-51,875,9378,-695];
 // ================= BOOT =================
 function bootSync(){
- scnPlan();planGrand();planSentinel();planWonders();planWater();planTowns();if(SCN&&SCN.ready)SCN.on=true;TOWNS.forEach(t=>{t.h=clamp(rawHeight(t.x,t.z),3,15);if(t.grand)t.h=19;FLATS.push({x:t.x,z:t.z,r:t.r,h:t.h,keep:!!t.grand});});planRoads();planRails();planPasses();planDeepwoods();planSites();planCastaway();
+ scnPlan();planGrand();planSentinel();planWonders();planWater();planTowns();if(SCN&&SCN.ready){scnLate();SCN.on=true;}TOWNS.forEach(t=>{t.h=clamp(rawHeight(t.x,t.z),3,15);if(t.grand)t.h=19;FLATS.push({x:t.x,z:t.z,r:t.r,h:t.h,keep:!!t.grand});});planRoads();planRails();planPasses();planDeepwoods();planSites();planCastaway();if(SCN&&SCN.on)scnLate2();
  buildTerrain();makeClouds();placeVegetation();initGrass();
  TOWNS.forEach(buildTown);DOORS.forEach((d,i)=>d.i=i);buildSentinel();buildEmerald();buildWonders();try{buildScenery();}catch(e){console.error(e);}buildSites();buildWorkSites();placeGuilds();buildRoadside();buildEmbassies();buildAirports();buildInteriors();planShips();for(let k=0;k<4;k++)for(let i=0;i<2;i++)makeWarBalloon(k);
  for(let i=0;i<9;i++){const a=rpick(STATIONS),b=rpick(STATIONS.filter(s=>s!==a));const g=makeBalloon(a.ki);const pilot=makeMouse({fur:rpick(FURS),coat:'#5a4632',trim:'#e0cfa8',hat:'cap'});pilot.g.position.set(0,.25,0);g.add(pilot.g);
@@ -6723,7 +6898,7 @@ function ldSet(p,label){const f=$('ldFill'),pc=$('ldPct'),st=$('ldStage'),bar=f&
 function ldTips(on){clearInterval(ldTipT);if(!on)return;const el=$('ldTip');if(!el)return;ldTipI=Math.floor(Math.random()*LD_TIPS.length);el.textContent=LD_TIPS[ldTipI];ldTipT=setInterval(()=>{el.style.opacity=0;setTimeout(()=>{ldTipI=(ldTipI+1)%LD_TIPS.length;el.textContent=LD_TIPS[ldTipI];el.style.opacity=1;},400);},4200);}
 function boot(){
  const S=[];const add=(label,w,fn)=>S.push({label,w,fn});
- add('Charting the land',1,()=>{scnPlan();planGrand();planSentinel();planWonders();planWater();planTowns();if(SCN&&SCN.ready)SCN.on=true;TOWNS.forEach(t=>{t.h=clamp(rawHeight(t.x,t.z),3,15);if(t.grand)t.h=19;FLATS.push({x:t.x,z:t.z,r:t.r,h:t.h,keep:!!t.grand});});planRoads();planRails();planPasses();planDeepwoods();planSites();planCastaway();});
+ add('Charting the land',1,()=>{scnPlan();planGrand();planSentinel();planWonders();planWater();planTowns();if(SCN&&SCN.ready){scnLate();SCN.on=true;}TOWNS.forEach(t=>{t.h=clamp(rawHeight(t.x,t.z),3,15);if(t.grand)t.h=19;FLATS.push({x:t.x,z:t.z,r:t.r,h:t.h,keep:!!t.grand});});planRoads();planRails();planPasses();planDeepwoods();planSites();planCastaway();if(SCN&&SCN.on)scnLate2();});
  add('Raising mountains and seas',3,()=>{buildTerrain();makeClouds();});
  add('Planting the forests',3,()=>{placeVegetation();initGrass();});
  add('Building towns and cities',0,null);

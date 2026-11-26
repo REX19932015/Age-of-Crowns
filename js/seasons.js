@@ -313,7 +313,7 @@
     // not their turn in the story: a line in character
     const m = mainStep();
     const where = m && m.pos ? ` Your next task: ${m.obj}.` : '';
-    A().openPanel(n.name, n.role, `<p><i>${esc(n.name)} looks up. They seem ${esc(n.voice)}.</i></p><p>“${esc(idleLine(id))}”</p>${where ? `<p class="ssnsoft">${esc(where)}</p>` : ''}`, [{ label: 'Farewell', close: true, fn: () => A().closePanel() }]);
+    A().openPanel(n.name, n.role, `<p>“${esc(idleLine(id))}”</p>${where ? `<p class="ssnsoft">${esc(where)}</p>` : ''}`, [{ label: 'Farewell', close: true, fn: () => A().closePanel() }]);
   }
   function idleLine(id) {
     const done = new Set((SS.story && SS.story.done) || []);

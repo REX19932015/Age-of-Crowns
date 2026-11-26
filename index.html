@@ -751,7 +751,7 @@ function rawHeight0(x,z){
  {const g=greenF(x,z);if(g>0)land=lerp(land,keysH(x,z),g);}
  land=grandShape(x,z,land);
  land=carveWater(x,z,land);land=carvePasses(x,z,land);
- const ca=SCN&&SCN.on?Math.exp(-Math.pow(wrapA(Math.atan2(z,x)-IRA)/.27,2))*smooth(1450,1900,Math.hypot(x,z)/WSC):0;if(ca>.04){const band=smooth(.42,.7,m)*(1-.5*smooth(.985,1,m));land+=ca*band*(40+26*fbm(x*.004+7,z*.004-3,3));}
+ const ca=SCN&&SCN.on?Math.exp(-Math.pow(wrapA(Math.atan2(z,x)-IRA)/.27,2))*smooth(1450,1900,Math.hypot(x,z)/WSC):0;if(ca>.04){const band=smooth(.42,.7,m)*(1-smooth(.8,1,m));land+=ca*band*(40+26*fbm(x*.004+7,z*.004-3,3));}
  const cl=Math.max(IW>.2?IW:0,ca);return scnApply(x,z,lerp(-24+det*4,land,smooth(lerp(.22,.5,cl)+.06*ca,lerp(.95,.6,cl)+.03*ca,m)));
 }
 function owner(x,z){biomeW(x,z,_bw);let b=0;for(let i=1;i<4;i++)if(_bw[i]>_bw[b])b=i;return b;}
@@ -919,9 +919,8 @@ function scnPlan(){
  SCN.karst={x:KC.x,z:KC.z,R:820,isl};
  // the Thousand Spires: sandstone pillars on the Verdantia–Pinehallow border (meshes, planned at build time)
  SCN.spires={x:-900,z:1200,R:430,lift:78,list:[]};
- // Hollowroar Falls: a horseshoe canyon in western Pinehallow that opens to the sea
- {const C={x:-3720,z:-500};let best=null;for(let i=0;i<48;i++){const a=i/48*TAU;for(let d=40;d<900;d+=20){if(rawHeight(C.x+Math.cos(a)*d,C.z+Math.sin(a)*d)<-2){if(!best||d<best.d)best={a,d};break;}}}
-  const a=best?best.a:PI;SCN.canyon={x:C.x,z:C.z,dx:Math.cos(a),dz:Math.sin(a),Rb:105,W:34,L:(best?best.d:400)+120,lift:58};}
+ // the Pinehallow Highlands, with Hollowroar Falls cut into their southern edge, draining to Hollow Lake
+ {const C={x:-2126,z:760};const L={x:-2220,z:1470};const dl=Math.hypot(L.x-C.x,L.z-C.z);SCN.high={x:C.x,z:C.z,R:560,lift:76};SCN.canyon={x:C.x+(L.x-C.x)/dl*-40,z:C.z+(L.z-C.z)/dl*-40,dx:(L.x-C.x)/dl,dz:(L.z-C.z)/dl,Rb:46,W:26,L:620,lake:L};}
  // the Rimeshelf: a sheet of sea ice that runs from Frosthold's north coast round to northern Pinehallow
  SCN.ice={pts:[{x:-760,z:-3560},{x:-1150,z:-3420},{x:-1520,z:-3330},{x:-1830,z:-3160},{x:-2080,z:-2870},{x:-2360,z:-2600},{x:-2520,z:-2270},{x:-2690,z:-2010},{x:-2900,z:-1790},{x:-3150,z:-1560},{x:-3420,z:-1400}],w0:560,w1:330};
  {const P0=SCN.ice.pts;let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const p of P0){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);z0=Math.min(z0,p.z);z1=Math.max(z1,p.z);}const pad=SCN.ice.w0+60;SCN.ice.bb=[x0-pad,x1+pad,z0-pad,z1+pad];let L=0;SCN.ice.cum=[0];for(let i=1;i<P0.length;i++){L+=Math.hypot(P0[i].x-P0[i-1].x,P0[i].z-P0[i-1].z);SCN.ice.cum.push(L);}SCN.ice.L=L;}
@@ -935,8 +934,12 @@ function scnApply(x,z,h){if(!SCN||!SCN.on)return h;
  {const K0=SCN.karst;const dx=x-K0.x,dz=z-K0.z;if(dx*dx+dz*dz<K0.R*K0.R*1.21){const dc=Math.sqrt(dx*dx+dz*dz);if(h<-1.5)h=Math.max(h,lerp(-2.4-1.2*fbm(x*.02,z*.02,2),h,smooth(K0.R*.72,K0.R*1.08,dc)));
   for(const q of K0.isl){const ex=x-q.x,ez=z-q.z;if(Math.abs(ex)>q.r*1.4||Math.abs(ez)>q.r*1.4)continue;const a=Math.atan2(ez,ex);const wob=1+.16*Math.sin(a*3+q.ph)+.1*Math.sin(a*5-q.ph*1.7);const dn=Math.hypot(ex,ez)/(q.r*wob);if(dn<1.12){const top=q.H*(.9+.18*fbm(x*.05,z*.05,2))*(1-.25*dn*dn);const wall=1-smooth(.86,1.02,dn);h=Math.max(h,lerp(h,top,wall));}}}}
  {const S=SCN.spires;const dx=x-S.x,dz=z-S.z;if(Math.abs(dx)<S.R*2&&Math.abs(dz)<S.R*2){const d=Math.hypot(dx,dz);const a=Math.atan2(dz,dx);const Re=S.R*(1+.09*Math.sin(a*3+1)+.05*Math.sin(a*7-2));if(d<Re*1.95){let lift=S.lift*smooth(Re*.985,Re*1.05,d)*(1-smooth(Re*1.4,Re*1.95,d));if(lift>0){const gap=Math.min(ROADS.length?smooth(16,52,roadD(x,z)):1,smooth(14,42,riverD(x,z)));h+=lift*gap*(.82+.36*fbm(x*.012+4,z*.012,2));}}}}
- {const C=SCN.canyon;const dx=x-C.x,dz=z-C.z;if(Math.abs(dx)<720&&Math.abs(dz)<720){const u=dx*C.dx+dz*C.dz,v=-dx*C.dz+dz*C.dx;const rb=C.Rb*(1+.06*Math.sin(Math.atan2(v,u)*7));const dB=Math.hypot(u,v)-rb;const dCh=(u>0&&u<C.L)?Math.abs(v)-C.W*(1+u/C.L*.8):1e9;const s=Math.min(dB,dCh);
-  const lift=C.lift*(1-smooth(40,420,s))*(1-smooth(C.L*.55,C.L*.95,u))*(.85+.3*fbm(x*.01,z*.01,2));const out=h+(s>0?lift:0);const f=1-smooth(-2,9,s);const jag=(fbm(x*.06,z*.06,2)-.5)*5*(1-f);h=lerp(out+jag,-4.5,f);}}
+ {const Hh=SCN.high;const dx=x-Hh.x,dz=z-Hh.z;if(Math.abs(dx)<Hh.R*1.05&&Math.abs(dz)<Hh.R*1.05){const d=Math.hypot(dx,dz);if(d<Hh.R){const a=Math.atan2(dz,dx);const Re=Hh.R*(1+.1*Math.sin(a*3+.7)+.06*Math.sin(a*5-1));
+  let lift=Hh.lift*(1-smooth(Re*.42,Re*.98,d));const hills=fbm(x*.006+3,z*.006-9,4);lift*=.78+.5*hills;let rg=fbm(x*.02,z*.02,3);lift+=8*(rg-.5)*(1-smooth(Re*.5,Re,d));
+  if(ROADS.length)lift*=smooth(24,110,roadD(x,z));
+  const C=SCN.canyon;const ex=x-C.x,ez=z-C.z;const u=ex*C.dx+ez*C.dz,v=-ex*C.dz+ez*C.dx;const rb=C.Rb*(1+.08*Math.sin(Math.atan2(v,u)*6));const dB=Math.hypot(u,v)-rb;const wv=C.W*(1+u/C.L*.9)*(1+.12*Math.sin(u*.05));const dCh=(u>0&&u<C.L)?Math.abs(v)-wv:1e9;const sd=Math.min(dB,dCh);
+  const cut=1-smooth(-1,7,sd);const jag=(fbm(x*.07,z*.07,2)-.5)*4*(1-cut);h=h+lift*(1-cut)+jag*smooth(10,40,lift);
+  if(cut>0){const pool=1-smooth(C.Rb*.4,C.Rb*.95,Math.hypot(u,v));h-=cut*(1.8+pool*3.2);}}}}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h<2.9){const q=scnIceQ(x,z);const W=scnIceW(q.t,x,z);if(q.d<W){const n=fbm(x*.02,z*.02,3);let ih=2.9+n*.5;if(q.t<.22)ih+=6.5*(1-q.t/.22)*(.7+.6*n);const crk=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5);if(crk<.018)ih-=.9;ih+=Math.max(0,.04-Math.abs(fbm(x*.011-2,z*.011+6,2)-.5))*30;h=Math.max(h,ih);}}}
  {const A=SCN.atoll;const dx=x-A.x,dz=z-A.z;if(Math.abs(dx)<A.R*1.6&&Math.abs(dz)<A.R*1.6){const d=Math.hypot(dx,dz);if(d<A.R*1.55){const a=Math.atan2(dz,dx);const w=scnAtollW(a,x,z);const off=Math.abs(d-A.Rr);let base;if(d<A.Rr)base=-1.6-2.2*smooth(A.Rr*.2,A.Rr*.85,A.Rr-d)-.6*fbm(x*.03,z*.03,2);else base=lerp(-2.6,-24,smooth(A.R*1.05,A.R*1.5,d));
   h=Math.max(h,base);if(off<w){const land=1-smooth(w*.55,w,off);const dune=2.2+2.6*fbm(x*.03+1,z*.03-2,3)*land;h=Math.max(h,lerp(base,dune,smooth(0,.35,land)));}}}}
@@ -947,19 +950,20 @@ function scnCol(x,z,h,slope){if(!SCN||!SCN.on)return null;
  {const A=SCN.atoll;const d=Math.hypot(x-A.x,z-A.z);if(d<A.R*1.2&&h>-.2){const t=smooth(1.4,3.6,h);return[lerp(.93,.3,t),lerp(.87,.55,t),lerp(.72,.22,t),1];}}
  {const K0=SCN.karst;const dc=Math.hypot(x-K0.x,z-K0.z);if(dc<K0.R&&h>1.2){const rk=smooth(.18,.42,slope);return[lerp(.2,.32,rk),lerp(.42,.33,rk),lerp(.14,.3,rk),1];}}
  {const S=SCN.spires;const dd=Math.hypot(x-S.x,z-S.z);if(dd<S.R*2.05){if(slope>.28){const b=Math.sin(h*.35+fbm(x*.01,z*.01,2)*2)*.5+.5;return[lerp(.5,.66,b),lerp(.45,.56,b),lerp(.37,.44,b),1];}if(h>18){const v=fbm(x*.03,z*.03,2);return[lerp(.17,.26,v),lerp(.38,.47,v),lerp(.12,.16,v),1-smooth(S.R*1.8,S.R*2.05,dd)];}}}
- {const C=SCN.canyon;const dx=x-C.x,dz=z-C.z;if(Math.abs(dx)<600&&Math.abs(dz)<600&&slope>.3&&h>-1){const b=Math.sin(h*.42+fbm(x*.01,z*.01,2)*2)*.5+.5;return[lerp(.46,.62,b),lerp(.4,.5,b),lerp(.34,.4,b),smooth(.3,.5,slope)];}}
+ {const Hh=SCN.high;const d=Math.hypot(x-Hh.x,z-Hh.z);if(d<Hh.R){if(slope>.26){const b=Math.sin(h*.5+fbm(x*.01,z*.01,2)*2.5)*.5+.5,mo=fbm(x*.04,z*.04,2);let c=[lerp(.24,.36,b),lerp(.23,.31,b),lerp(.21,.27,b)];if(mo>.58)c=[c[0]*.8,c[1]*1.15,c[2]*.75];return[c[0],c[1],c[2],1];}if(h>30){const v=fbm(x*.02+5,z*.02,3),hv=fbm(x*.05,z*.05,2);let c=[lerp(.3,.42,v),lerp(.38,.46,v),lerp(.16,.2,v)];if(hv>.62)c=[.42,.3,.4];return[c[0],c[1],c[2],(1-smooth(Hh.R*.8,Hh.R,d))*smooth(30,40,h)];}}}
  return null;}
 function scnName(x,z){if(!SCN||!SCN.on)return null;
- if(SCN.castle&&Math.hypot(x-SCN.castle.x,z-SCN.castle.z)<70)return 'Dunwhisker Castle (ruins)';
+ if(SCN.castle&&Math.hypot(x-SCN.castle.x,z-SCN.castle.z)<95)return 'Dunwhisker Castle';
  {const A=SCN.atoll;if(Math.hypot(x-A.x,z-A.z)<A.R*1.35){for(const t of TOWNS)if(t.nation==='atoll'&&Math.hypot(t.x-x,t.z-z)<t.r*1.2)return t.name;return 'Saltglass Atoll (unclaimed)';}}
  {const K0=SCN.karst;if(Math.hypot(x-K0.x,z-K0.z)<K0.R)return 'The Jade Teeth';}
  {const S=SCN.spires;if(Math.hypot(x-S.x,z-S.z)<S.R*1.05)return 'The Thousand Spires';}
- {const C=SCN.canyon;if(Math.hypot(x-C.x,z-C.z)<C.Rb+260)return 'Hollowroar Falls';}
+ {const C=SCN.canyon;const ex=x-C.x,ez=z-C.z;const u=ex*C.dx+ez*C.dz,v=-ex*C.dz+ez*C.dx;if(Math.hypot(u,v)<C.Rb+60||(u>0&&u<C.L*.8&&Math.abs(v)<70))return 'Hollowroar Falls';}
+ {const Hh=SCN.high;if(Math.hypot(x-Hh.x,z-Hh.z)<Hh.R*.9)return 'The Pinehallow Highlands';}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&heightAt(x,z)>2.4){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z))return 'The Rimeshelf';}}
  return null;}
 function scnUnclaimed(x,z){return !!(SCN&&SCN.on&&SCN.atoll&&Math.hypot(x-SCN.atoll.x,z-SCN.atoll.z)<SCN.atoll.R*1.35);}
 // Oakcross: a lone village on the coast beside the Rimeshelf, near where it always stood
-function oakSite(){const A={x:-2242,z:-2398};let best=null,bs=1e9;for(let r=0;r<=160;r+=8)for(let i=0;i<(r?16:1);i++){const a=i/16*TAU;const x=A.x+Math.cos(a)*r,z=A.z+Math.sin(a)*r;const h=rawHeight(x,z);if(h<4||h>28)continue;let bad=false;for(const s0 of[[20,0],[-20,0],[0,20],[0,-20]])if(Math.abs(rawHeight(x+s0[0],z+s0[1])-h)>6){bad=true;break;}if(bad)continue;const sc=r+Math.abs(h-10)*3;if(sc<bs){bs=sc;best={x,z};}}return best||A;}
+function oakSite(){const A={x:-2360,z:-2110};let best=null,bs=1e9;for(let r=0;r<=160;r+=8)for(let i=0;i<(r?16:1);i++){const a=i/16*TAU;const x=A.x+Math.cos(a)*r,z=A.z+Math.sin(a)*r;const h=rawHeight(x,z);if(h<4||h>28)continue;let bad=false;for(const s0 of[[20,0],[-20,0],[0,20],[0,-20]])if(Math.abs(rawHeight(x+s0[0],z+s0[1])-h)>6){bad=true;break;}if(bad)continue;const sc=r+Math.abs(h-10)*3;if(sc<bs){bs=sc;best={x,z};}}return best||A;}
 // a remote, roadless spot for a village: as far as possible from every other settlement
 function remoteSite(ki,rad){let best=null,bs=-1;const rr2=mulberry(808);const caps=[{x:0,z:-1280*WSC},{x:0,z:1120*WSC},{x:3000,z:0},{x:-3700,z:600}];
  for(let i=0;i<9000;i++){const a=K[ki].ang+(rr2()-.5)*2.2,r0=(500+rr2()*2300)*WSC;const x=Math.cos(a)*r0,z=Math.sin(a)*r0;const h=rawHeight(x,z);if(h<4||h>40)continue;if(owner(x,z)!==ki)continue;if(wonderBlocked(x,z,120))continue;
@@ -992,14 +996,20 @@ function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND
    {const g0=-4;scnRock(P,Cc,I,q.x,g0,q.z,q.r*.95,q.H*.78-g0,4100+Math.round(q.x*7+q.z),KARST,true);}
    for(let k=0;k<3;k++){const a=r2()*TAU;scnRock(P,Cc,I,q.x+Math.cos(a)*q.r*1.05,-3,q.z+Math.sin(a)*q.r*1.05,2+r2()*3,3+r2()*5,4400+k+Math.round(q.x),KARST);}}
   LANDMARKS.push({name:'the Jade Teeth',x:K0.x,z:K0.z,r:K0.R});}
- // ---- Hollowroar Falls
- {const C=SCN.canyon;const lipD=C.Rb*(1+.06*Math.sin(PI*7))+2;const lx=C.x-C.dx*lipD,lz=C.z-C.dz*lipD;const ly=heightAt(lx-C.dx*6,lz-C.dz*6);
-  waterfall(lx,ly+.4,lz,lx+C.dx*10,-1,lz+C.dz*10,30,'Hollowroar Falls');waterfall(lx+C.dz*20,ly+.2,lz-C.dx*20,lx+C.dz*18+C.dx*8,-1,lz-C.dx*18+C.dz*8,9,null);
-  {const st=[];for(let i=0;i<=24;i++){const u=i/24;const d=lipD+260*(1-u);st.push({x:C.x-C.dx*d+Math.sin(u*8)*12*(1-u)*C.dz,z:C.z-C.dz*d-Math.sin(u*8)*12*(1-u)*C.dx});}
-   const pos=[],idx=[];st.forEach((q,i)=>{const nx=i<st.length-1?st[i+1].x-q.x:q.x-st[i-1].x,nz=i<st.length-1?st[i+1].z-q.z:q.z-st[i-1].z,l=Math.hypot(nx,nz)||1;const w=6+i*.4;const y=heightAt(q.x,q.z)+.4;pos.push(q.x-nz/l*w,y,q.z+nx/l*w,q.x+nz/l*w,y,q.z-nx/l*w);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});
-   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x3f8aa8,roughness:.08,metalness:.1,transparent:true,opacity:.88})));}
-  const r2=mulberry(5151);for(let t=0;t<700;t++){const a=r2()*TAU,d=C.Rb+8+r2()*240;const x=C.x+Math.cos(a)*d,z=C.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<6)continue;const sl=Math.abs(heightAt(x+2,z)-h)+Math.abs(heightAt(x,z+2)-h);if(sl>3)continue;scnVeg(r2()<.8?'pine':'broad',x,h-.25,z,.7+r2()*.6);}
-  SCN.mist={x:lx+C.dx*14,z:lz+C.dz*14};}
+ // ---- Hollowroar Falls in the Pinehallow Highlands
+ {const C=SCN.canyon,Hh=SCN.high;const lipD=C.Rb+3;const lx=C.x-C.dx*lipD,lz=C.z-C.dz*lipD;const top=heightAt(lx-C.dx*10,lz-C.dz*10);const pb=heightAt(C.x,C.z);const py=pb+2.4;
+  const wm=new THREE.MeshStandardMaterial({color:0x2f7f96,roughness:.06,metalness:.15,transparent:true,opacity:.86});
+  {const g=new THREE.CircleGeometry(C.Rb*1.02,40).rotateX(-PI/2);const m=new THREE.Mesh(g,wm);m.position.set(C.x,py,C.z);scene.add(m);}
+  waterfall(lx,top+.3,lz,lx+C.dx*8,py,lz+C.dz*8,24,'Hollowroar Falls');waterfall(lx-C.dz*15,top+.2,lz+C.dx*15,lx-C.dz*13+C.dx*7,py,lz+C.dx*13+C.dz*7,8,null);waterfall(lx+C.dz*13,top+.2,lz-C.dx*13,lx+C.dz*11+C.dx*6,py,lz-C.dx*11+C.dz*6,6,null);
+  const ribbon=(pts,w0,w1,yo)=>{const pos=[],idx=[];pts.forEach((q,i)=>{const nx=i<pts.length-1?pts[i+1].x-q.x:q.x-pts[i-1].x,nz=i<pts.length-1?pts[i+1].z-q.z:q.z-pts[i-1].z,l=Math.hypot(nx,nz)||1;const w=lerp(w0,w1,i/(pts.length-1));const y=Math.max(q.y!==undefined?q.y:heightAt(q.x,q.z)+yo,.15);pos.push(q.x-nz/l*w,y,q.z+nx/l*w,q.x+nz/l*w,y,q.z-nx/l*w);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,wm));};
+  // stream across the moor to the lip
+  {const st=[];for(let i=0;i<=24;i++){const u=i/24;const d=lipD+300*(1-u);st.push({x:C.x-C.dx*d+Math.sin(u*8)*14*(1-u)*C.dz,z:C.z-C.dz*d-Math.sin(u*8)*14*(1-u)*C.dx});}ribbon(st,4,7,.35);}
+  // river down the canyon floor and on to Hollow Lake
+  {const st=[];const L0=C.lake;const ex={x:C.x+C.dx*C.L,z:C.z+C.dz*C.L};const n=40;for(let i=0;i<=n;i++){const u=i/n;let x,z;if(u<.6){const t=u/.6;x=lerp(C.x+C.dx*C.Rb*.8,ex.x,t);z=lerp(C.z+C.dz*C.Rb*.8,ex.z,t);}else{const t=(u-.6)/.4;x=lerp(ex.x,L0.x,t)+Math.sin(t*6)*18*(1-t);z=lerp(ex.z,L0.z,t);}st.push({x,z});}
+   let prev=py;for(const q of st){const g=heightAt(q.x,q.z)+.35;q.y=Math.min(prev,g);prev=q.y;if(q.y<.3)q.y=.15;}ribbon(st,7,11,.35);}
+  const r2=mulberry(5151);for(let t=0;t<1600;t++){const a=r2()*TAU,d=Math.sqrt(r2())*Hh.R*.95;const x=Hh.x+Math.cos(a)*d,z=Hh.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<6)continue;const sl=Math.abs(heightAt(x+2,z)-h)+Math.abs(heightAt(x,z+2)-h);if(sl>3.2){if(r2()<.12)scnVeg('rock',x,h-.3,z,1+r2()*2);continue;}if(onWay(x,z,4))continue;const q=r2();const grove=fbm(x*.01+2,z*.01,3)>.5;if(grove&&q<.7)scnVeg('pine',x,h-.25,z,.7+r2()*.7);else if(q<.12)scnVeg('rmoss',x,h-.3,z,.8+r2()*1.6);else if(q<.3)scnVeg('fern',x,h-.25,z,.8+r2()*.5);}
+  for(let t=0;t<500;t++){const a=r2()*TAU,d=C.Rb+4+r2()*90;const x=C.x+Math.cos(a)*d,z=C.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<pb+20)continue;scnVeg('pine',x,h-.25,z,.8+r2()*.6);}
+  LANDMARKS.push({name:'the Pinehallow Highlands',x:Hh.x,z:Hh.z,r:Hh.R});SCN.mist={x:lx+C.dx*10,z:lz+C.dz*10};}
  // ---- the Rimeshelf: no trees on the ice, a few pressure-ridge blocks
  {const I0=SCN.ice,b=I0.bb;const onIce=(x,z)=>x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&heightAt(x,z)>2.5&&heightAt(x,z)<14&&scnIceQ(x,z).d<scnIceW(scnIceQ(x,z).t,x,z);scnClearVeg(onIce);
   const vb=new VB(),r2=mulberry(6161);for(let t=0;t<1600;t++){const x=b[0]+r2()*(b[1]-b[0]),z=b[2]+r2()*(b[3]-b[2]);if(!onIce(x,z))continue;const h=heightAt(x,z);const s=1+r2()*3.5;vb.add(r2()<.5?GB.ico0:GB.dode,r2()<.5?'#e6f1f7':'#cfe3ef',TM(x,h-.3*s,z,s*(1+r2()),s*(.5+r2()*.8),s*(1+r2()),r2(),r2()*3,r2()),'#a9cfe2');}
@@ -1012,26 +1022,45 @@ function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND
   LANDMARKS.push({name:'Saltglass Atoll',x:A.x,z:A.z,r:A.R});}
  if(P.length)scnMesh(P,Cc,I);
  try{scnCoral();}catch(e){console.error(e);}
+ try{scnOakInn();}catch(e){console.error(e);}
  // ---- Dunwhisker Castle on the southern Pinehallow sea cliffs
- {let best=null,bs=-1;for(let a=2.38;a<=2.86;a+=.01){let last=null;for(let r0=1500*WSC;r0<3300*WSC;r0+=8){const x=Math.cos(a)*r0,z=Math.sin(a)*r0;const h=heightAt(x,z);if(h<0){if(last&&last.h>28){let sea=0;for(let k=0;k<16;k++){const q=k/16*TAU;if(heightAt(last.x+Math.cos(q)*55,last.z+Math.sin(q)*55)<0)sea++;}const sc=sea*10+last.h;if(sea>=4&&sea<=10&&sc>bs&&TOWNS.every(t=>Math.hypot(t.x-last.x,t.z-last.z)>t.r+120)&&!onWay(last.x,last.z,30)){bs=sc;best={x:last.x-Math.cos(a)*16,z:last.z-Math.sin(a)*16,a};}}break;}last={x,z,h};}}
-  if(best){SCN.castle=best;scnCastle(best.x,best.z,best.a);LANDMARKS.push({name:'Dunwhisker Castle',x:best.x,z:best.z,r:40});}}}
-function scnCastle(cx,cz,a){const b=new VB(),wb=new VB();const r2=mulberry(1313);const ry=-a+PI/2;const y0=heightAt(cx,cz);const f=FR(cx,y0,cz,ry);const S=['#8f8b82','#7d7a72','#9b978c','#86827a'];const MO='#5d7536';
- const pt=(lx,lz)=>new V3(lx,0,lz).applyMatrix4(f);
- const footing=(lx,lz,w,d)=>{const p=pt(lx,lz);const g=heightAt(p.x,p.z);return g-y0;};
- const wall=(x0,z0,x1,z1,h,th)=>{const L0=Math.hypot(x1-x0,z1-z0),n=Math.max(2,Math.round(L0/2.4));const ang=Math.atan2(x1-x0,z1-z0);for(let i=0;i<n;i++){const u=(i+.5)/n;const lx=lerp(x0,x1,u),lz=lerp(z0,z1,u);const gap=r2()<.12;if(gap)continue;const fy=footing(lx,lz);const hh=h*(r2()<.3?.35+r2()*.5:.85+r2()*.25);b.add(GB.box,rpick(S),L(f,lx,fy-6,lz,th,hh+6,L0/n+.05,0,ang,0),MO);if(hh>h*.8&&r2()<.6)b.add(GB.box,rpick(S),L(f,lx,fy+hh,lz,th+.1,.9,L0/n*.45,0,ang,0));const p=pt(lx,lz);addCol(p.x,p.z,th*.75);}};
- const tower=(lx,lz,r,h,sq)=>{const fy=footing(lx,lz);b.add(sq?GB.box:GB.cyl,rpick(S),L(f,lx,fy-7,lz,sq?r*2:r,h+7,sq?r*2:r),MO);for(let k=0;k<7;k++){const q=k/7*TAU;if(r2()<.35)continue;b.add(GB.box,rpick(S),L(f,lx+Math.cos(q)*r*.85,fy+h,lz+Math.sin(q)*r*.85,1.2,.6+r2()*2.2,1.2,0,q,0));}
-  for(let k=0;k<4;k++){const q=k/4*TAU+r2();const yy=fy+3+r2()*(h-5);wb.add(GB.boxc,'#000',L(f,lx+Math.cos(q)*(r+.02),yy,lz+Math.sin(q)*(r+.02),.7,1.6,.7,0,-q,0));}const p=pt(lx,lz);addCol(p.x,p.z,r*1.05);};
- // curtain walls round a rough rectangle on the headland, open gate on the landward side
- const W2=19,D2=15;wall(-W2,-D2,W2,-D2,8,1.6);wall(W2,-D2,W2,D2,7,1.6);wall(W2,D2,4,D2,8,1.6);wall(-4,D2,-W2,D2,8,1.6);wall(-W2,D2,-W2,-D2,6.5,1.6);
- tower(-W2,-D2,3.6,13);tower(W2,-D2,3.2,11);tower(W2,D2,3.4,14);tower(-W2,D2,3,10);
- // the great keep and a broken hall
- tower(-6,-4,5,19,true);{const fy=footing(8,2);b.add(GB.box,rpick(S),L(f,8,fy-6,2,12,13,1.2),MO);b.add(GB.box,rpick(S),L(f,13.6,fy-6,-2,1.2,10,9),MO);for(let k=0;k<3;k++)wb.add(GB.boxc,'#000',L(f,5+k*3.2,fy+6.5,2.62,1.1,2.6,.2));}
- // gatehouse arch and a stone causeway inland
- {const fy=footing(0,D2);for(const sx of[-1,1])b.add(GB.box,rpick(S),L(f,sx*3.4,fy-6,D2,2.6,16,3.2),MO);b.add(GB.box,rpick(S),L(f,0,fy+7.2,D2,9.4,2.2,3.2));wb.add(GB.boxc,'#000',L(f,0,fy+5.2,D2+1.62,3.2,1,.1));
-  for(let i=1;i<=8;i++){const lz=D2+i*3;const fy2=footing(0,lz);b.add(GB.box,'#8a857a',L(f,0,fy2-3,lz,5,3.2,3.1),MO);}}
- for(let i=0;i<40;i++){const lx=(r2()-.5)*W2*2.2,lz=(r2()-.5)*D2*2.2;const fy=footing(lx,lz);b.add(GB.dode,rpick(S),L(f,lx,fy+.2,lz,.5+r2()*1.1,.35+r2()*.6,.5+r2()*1.1,r2(),r2()*3,r2()));}
- const m=new THREE.Mesh(b.geometry(),archMat);m.castShadow=true;m.receiveShadow=true;scene.add(m);if(wb.p.length)scene.add(new THREE.Mesh(wb.geometry(),new THREE.MeshBasicMaterial({color:0x14110d})));}
-
+ {let best=null,bs=-1;for(let a=2.38;a<=2.86;a+=.01){let last=null;const hist=[];for(let r0=1500*WSC;r0<3300*WSC;r0+=8){const x=Math.cos(a)*r0,z=Math.sin(a)*r0;const h=heightAt(x,z);hist.push({x,z,h});if(hist.length>7)hist.shift();if(h<0){last=hist.reduce((m,q)=>q.h>m.h?q:m,hist[0]);if(last&&last.h>24){let sea=0;for(let k=0;k<16;k++){const q=k/16*TAU;if(heightAt(last.x+Math.cos(q)*55,last.z+Math.sin(q)*55)<0)sea++;}const sc=sea*10+last.h;if(sea>=3&&sea<=9&&sc>bs&&TOWNS.every(t=>Math.hypot(t.x-last.x,t.z-last.z)>t.r+120)&&!onWay(last.x,last.z,30)){bs=sc;best={x:last.x-Math.cos(a)*30,z:last.z-Math.sin(a)*30,a};}}break;}}}
+  if(best){SCN.castle=best;scnCastle(best.x,best.z,best.a);LANDMARKS.push({name:'Dunwhisker Castle',x:best.x,z:best.z,r:60});}}}
+function scnCastle(cx,cz,a){htxInit();const T={};for(const k in HTXM)T[k]=new VB();const b=new VB(),wb=new VB();const r2=mulberry(1313);const ry=-a+PI/2;const y0=heightAt(cx,cz);const f=FR(cx,y0,cz,ry);
+ const SC=['#a29d92','#958f84','#aaa598','#8d887e'],MO='#6f8442',ST=T.stone,RF=T.slate;const sc=()=>SC[Math.floor(r2()*SC.length)];
+ const pt=(lx,lz)=>new V3(lx,0,lz).applyMatrix4(f);const fy=(lx,lz)=>{const p=pt(lx,lz);return heightAt(p.x,p.z)-y0;};
+ const sbox=(lx,ly,lz,w,h,d,ryy,col2)=>tbx(ST,sc(),L(f,lx,ly,lz,w,h,d,0,ryy||0,0),w,h,d,2.2,col2===undefined?MO:col2);
+ // a stone run of wall with a wall-walk, crenellations and the odd breach
+ const wall=(x0,z0,x1,z1,h,th,ruin)=>{const L0=Math.hypot(x1-x0,z1-z0),n=Math.max(2,Math.round(L0/3.2));const ang=Math.atan2(x1-x0,z1-z0);for(let i=0;i<n;i++){const u=(i+.5)/n;const lx=lerp(x0,x1,u),lz=lerp(z0,z1,u);const g=fy(lx,lz);const broken=ruin&&r2()<.22;const hh=broken?h*(.35+r2()*.35):h;
+   sbox(lx,g-9,lz,th,hh+9,L0/n+.06,ang);if(!broken){for(let k=0;k<2;k++)if(r2()<.85)sbox(lx+Math.sin(ang)*(k?.9:-.9)*(L0/n)*.25,g+hh,lz+Math.cos(ang)*(k?.9:-.9)*(L0/n)*.25,th+.15,1.1,(L0/n)*.32,ang,null);if(r2()<.35)wb.add(GB.boxc,'#000',L(f,lx,g+hh*.55,lz,th+.06,.9,.22,0,ang,0));}
+   const p=pt(lx,lz);addCol(p.x,p.z,th*.8);}};
+ const tower=(lx,lz,r,h,roof)=>{const g=fy(lx,lz);ST.add(GB.cyl,sc(),L(f,lx,g-10,lz,r,h+10,r),MO,[0,0,r*2.8/2.2,(h+10)/2.2]);ST.add(GB.cyl,shadeHex(SC[0],.9),L(f,lx,g+h-.6,lz,r+.35,.6,r+.35),null,[0,0,r*3/2.2,.3]);
+  if(roof){RF.add(GB.cone,'#5a5f66',L(f,lx,g+h,lz,r+.5,r*2.2,r+.5),'#3e434a',[0,0,r*2.4,r*1.6]);b.add(GB.cone,'#d9b24a',L(f,lx,g+h+r*2.2,lz,.12,1.2,.12));}
+  else for(let k=0;k<10;k++){const q=k/10*TAU;if(r2()<.25)continue;sbox(lx+Math.cos(q)*r*.9,g+h,lz+Math.sin(q)*r*.9,1.1,1+r2()*.8,1.1,-q,null);}
+  for(let k=0;k<6;k++){const q=k/6*TAU+r2()*.4;const yy=g+3+r2()*(h-6);wb.add(GB.boxc,'#000',L(f,lx+Math.cos(q)*(r+.02),yy,lz+Math.sin(q)*(r+.02),.5,1.8,.5,0,-q,0));}const p=pt(lx,lz);addCol(p.x,p.z,r*1.05);};
+ const W2=31,D2=23;
+ wall(-W2,-D2,W2,-D2,12,2.4,true);wall(W2,-D2,W2,D2,11,2.4,true);wall(W2,D2,6,D2,12,2.4,false);wall(-6,D2,-W2,D2,12,2.4,false);wall(-W2,D2,-W2,-D2,10,2.4,true);
+ tower(-W2,-D2,5.2,21,true);tower(W2,-D2,4.6,17,false);tower(W2,D2,5,22,true);tower(-W2,D2,4.6,16,false);tower(0,-D2,3.6,15,false);
+ // the great keep with corner turrets and a slate roof
+ {const kx=-13,kz=-8,kw=14,kd=13,kh=30;const g=fy(kx,kz);sbox(kx,g-10,kz,kw,kh+10,kd);for(const sx of[-1,1])for(const sz of[-1,1]){const tx=kx+sx*kw/2,tz=kz+sz*kd/2;ST.add(GB.cyl,sc(),L(f,tx,g+kh-6,tz,1.8,9,1.8),MO,[0,0,2.4,4]);RF.add(GB.cone,'#5a5f66',L(f,tx,g+kh+3,tz,2.2,4.5,2.2),'#3e434a',[0,0,3,2]);}
+  RF.add(GB.pyr,'#5c6168',L(f,kx,g+kh,kz,kw*.66,8,kd*.66),'#40454c',[0,0,6,4]);for(let q=0;q<3;q++)for(const sx of[-1,1]){wb.add(GB.boxc,'#000',L(f,kx+sx*3.4,g+8+q*7,kz+kd/2+.03,1.2,2.6,.08));wb.add(GB.boxc,'#000',L(f,kx+kw/2+.03,g+8+q*7,kz+sx*3.2,.08,2.6,1.2));}
+  const p=pt(kx,kz);addCol(p.x,p.z,Math.max(kw,kd)*.6);}
+ // the roofless great hall, its gable ends still standing
+ {const hx=12,hz=-6,hw=20,hd=10,hh=11;const g=fy(hx,hz);for(const s0 of[-1,1])sbox(hx,g-8,hz+s0*hd/2,hw,hh+8,1.3);for(const s0 of[-1,1]){sbox(hx+s0*hw/2,g-8,hz,1.3,hh+8,hd);ST.add(GB.prism,sc(),L(f,hx+s0*hw/2,g+hh,hz,1.3,6,hd,0,0,0),null,[0,0,hd/2.2,3]);}
+  for(let i=0;i<4;i++)for(const s0 of[-1,1])wb.add(GB.boxc,'#000',L(f,hx-7.5+i*5,g+5.5,hz+s0*(hd/2+.66),1.4,4,.1));for(let i=0;i<5;i++){const p=pt(hx-8+i*4,hz-hd/2);addCol(p.x,p.z,1.2);const q=pt(hx-8+i*4,hz+hd/2);addCol(q.x,q.z,1.2);}}
+ // twin-towered gatehouse, portcullis and a stone bridge inland
+ {const g=fy(0,D2);for(const sx of[-1,1]){ST.add(GB.cyl,sc(),L(f,sx*5,g-10,D2+1,3.4,25,3.4),MO,[0,0,7.5,11]);RF.add(GB.cone,'#5a5f66',L(f,sx*5,g+15,D2+1,3.9,7,3.9),'#3e434a',[0,0,5,3]);}
+  sbox(0,g+6.5,D2+1,7,6,3.2);for(let i=-2;i<=2;i++)wb.add(GB.boxc,'#000',L(f,i*.55,g+3.3,D2+2.66,.14,6.4,.1));wb.add(GB.boxc,'#000',L(f,0,g+5.6,D2+2.66,3.2,.14,.1));
+  for(let i=1;i<=12;i++){const lz=D2+2.6+i*3;const g2=fy(0,lz);sbox(0,g2-6,lz,5.2,6.4,3.15);if(i%3===0)for(const sx of[-1,1])sbox(sx*2.5,g2+.4,lz,.5,1,3.15);}}
+ // courtyard well and tumbled stones
+ {const g=fy(2,8);ST.add(GB.cyl,sc(),L(f,2,g,8,1.5,1,1.5),null,[0,0,2,.5]);b.add(GB.box,'#4a3424',L(f,2,g+1,8,.15,2,.15));}
+ for(let i=0;i<60;i++){const lx=(r2()-.5)*W2*2.2,lz=(r2()-.5)*D2*2.2;const g=fy(lx,lz);ST.add(GB.dode,sc(),L(f,lx,g+.2,lz,.5+r2()*1.2,.35+r2()*.7,.5+r2()*1.2,r2(),r2()*3,r2()),MO,[0,0,1,1]);}
+ for(const k in T){if(!T[k].p.length)continue;const m=new THREE.Mesh(T[k].geometry(),HTXM[k]);m.castShadow=true;m.receiveShadow=true;scene.add(m);}
+ if(b.p.length)scene.add(new THREE.Mesh(b.geometry(),archMat));if(wb.p.length)scene.add(new THREE.Mesh(wb.geometry(),new THREE.MeshBasicMaterial({color:0x14110d})));}
+// Oakcross gets a proper inn of its own
+function scnOakInn(){const t=TOWNS.find(q=>q.name==='Oakcross'&&q.remote);if(!t||t.inn)return;const base={x:t.x+Math.cos(t.ga||0)*12,z:t.z+Math.sin(t.ga||0)*12};const p=innSpot({x:t.x,z:t.z,r:t.r*1.6},base)||base;const b=new VB(),wb=new VB();const face=Math.atan2(t.x-p.x,t.z-p.z);
+ house(b,wb,p.x,p.z,face,t.k,{big:true,door:'tavern',town:t});t.inn=p;townNPC(t,'innkeeper',p.x+Math.sin(face)*7.4-Math.cos(face)*3.4,p.z+Math.cos(face)*7.4+Math.sin(face)*3.4,{yaw:face});
+ if(b.p.length){const m=new THREE.Mesh(b.geometry(),archMat);m.castShadow=true;m.receiveShadow=true;scene.add(m);}if(wb.p.length)scene.add(new THREE.Mesh(wb.geometry(),winMat));flushHouses();}
 // ---- coral reefs on warm shallow seabeds: atoll, Jade Teeth, and the southern and eastern coasts
 function scnCoral(){const V=new VB(),r=mulberry(9191);const COL=['#ff7f6b','#ff9fc6','#ffd166','#9b5de5','#3bd6c6','#f15bb5','#e76f51','#c3f73a','#ff6f91','#f9c74f'];let patches=0;
  const warm=(x,z)=>{if(SCN.atoll&&Math.hypot(x-SCN.atoll.x,z-SCN.atoll.z)<SCN.atoll.R*1.25)return 1;if(Math.hypot(x-SCN.karst.x,z-SCN.karst.z)<SCN.karst.R*1.1)return 1;biomeW(x,z,_bw);return _bw[2]+_bw[3]>.6&&z>-HALF*.15?.5:0;};
@@ -2638,6 +2667,34 @@ function openAdmin(){
 
 // ================= INTERIORS =================
 function fade(fn){$('fade').style.opacity=1;setTimeout(()=>{fn();$('fade').style.opacity=0;},240);}
+// ================= INTERIORS: dress a room to match the new houses outside =================
+function roomDress(R0,o){o=o||{};htxInit();const T={};for(const k in HTXM)T[k]=new VB();const b=new VB(),wb=new VB();const{cx,cz,w,d,h}=R0;const r=mulberry(Math.round(cx*3+cz*7));const iw=w/2-.2,id=d/2-.2;const WD=T.wood,PL=T.plaster,ST=T.stone;
+ const wood=o.wood||'#7a5434',dark='#3e2a1a',cloth=o.cloth||'#7a2a2a';
+ // floorboards, plaster walls over oak panelling, a boarded ceiling on heavy beams
+ tbx(WD,o.floor||'#9a7450',TM(cx,0,cz,w-.4,.05,d-.4),w-.4,.05,d-.4,.8);
+ const walls=[[cx,cz-id,0,w-.4],[cx,cz+id,PI,w-.4],[cx-iw,cz,PI/2,d-.4],[cx+iw,cz,-PI/2,d-.4]];
+ for(const[x,z,ry,span]of walls){const f=TM(x,0,z,1,1,1,0,ry,0);tbx(PL,R0.wall,L(f,0,1.2,.03,span,h-1.2,.06),span,h-1.2,.06,2.4);tbx(WD,wood,L(f,0,.05,.05,span,1.15,.08),span,1.15,.08,1.1);tbx(WD,dark,L(f,0,1.16,.1,span,.12,.14),span,.12,.14,1);tbx(WD,dark,L(f,0,.05,.1,span,.16,.1),span,.16,.1,1);
+  for(let q=-span/2+1.2;q<span/2-.6;q+=2.4)tbx(WD,dark,L(f,q,.15,.1,.08,.9,.04),.08,.9,.04,1);}
+ tbx(WD,'#8a6a46',TM(cx,h-.07,cz,w-.4,.06,d-.4),w-.4,.06,d-.4,.9);
+ for(let z=-d/2+1.6;z<d/2-.8;z+=2.6)tbx(WD,dark,TM(cx,h-.55,cz+z,w-.4,.42,.32),w-.4,.42,.32,1.2);tbx(WD,dark,TM(cx,h-.9,cz,.36,.4,d-.4),.36,.4,d-.4,1.2);
+ for(const sx of[-1,1])for(const sz of[-1,1])tbx(WD,dark,TM(cx+sx*(iw-.15),0,cz+sz*(id-.15),.32,h,.32),.32,h,.32,1);
+ // window frames, sills, glazing bars and curtains on the side walls
+ if(!R0.noWin)for(let z=-d/2+3;z<d/2-2;z+=4)for(const s of[-1,1]){const f=TM(cx+s*(iw-.02),0,cz+z,1,1,1,0,-s*PI/2,0);const wy=h*.55;
+  for(const sx of[-1,1])tbx(WD,wood,L(f,sx*.65,wy,.06,.14,1.8,.12),.14,1.8,.12,1,null,true);tbx(WD,wood,L(f,0,wy+.86,.06,1.44,.14,.12),1.44,.14,.12,1,null,true);tbx(WD,wood,L(f,0,wy-.86,.12,1.6,.12,.3),1.6,.12,.3,1,null,true);
+  tbx(WD,wood,L(f,0,wy,.08,.06,1.5,.05),.06,1.5,.05,1,null,true);tbx(WD,wood,L(f,0,wy+.15,.08,1.1,.06,.05),1.1,.06,.05,1,null,true);
+  for(const sx of[-1,1])b.add(GB.box,cloth,L(f,sx*.98,wy-1.05,.16,.42,2.3,.08),shadeHex(cloth,.7));b.add(GB.cyl,'#2a1c10',L(f,0,wy+1.12,.18,.04,1.0,.04,0,0,PI/2));}
+ // a stone chimney breast above the hearth
+ if(o.fire){const[fx,fz,fw]=o.fire;tbx(ST,'#a39b8e',TM(fx,2.4,fz-.1,fw+.6,h-2.4,.8),fw+.6,h-2.4,.8,1.8);tbx(WD,dark,TM(fx,2.3,fz+.25,fw+1,.22,.5),fw+1,.22,.5,1);
+  for(let i=0;i<5;i++)b.add(GB.cyl,['#c9a24a','#7a3a2a','#3a5a7a','#e8e0d0','#5a7a3a'][i],TM(fx-fw*.4+i*fw*.2,2.52,fz+.25,.09,.22+r()*.15,.09));}
+ // a dresser of plates, a picture or two, herbs drying from a beam, and a few odds and ends
+ if(o.dresser){const[dx,dz,ry]=o.dresser;const f=TM(dx,0,dz,1,1,1,0,ry,0);tbx(WD,wood,L(f,0,0,0,2.2,1,.6),2.2,1,.6,1);tbx(WD,shadeHex(wood,.85),L(f,0,1,-.18,2.2,1.6,.22),2.2,1.6,.22,1);for(const y of[1.55,2.15])tbx(WD,dark,L(f,0,y,-.05,2.2,.05,.3),2.2,.05,.3,1);
+  for(const y of[1.6,2.2])for(let i=0;i<5;i++)b.add(GB.cylc,i%2?'#e8eef6':'#3a5f9a',L(f,-.8+i*.4,y+.2,-.05,.17,.03,.17,PI/2-.25,0,0));addCol(dx,dz,1);}
+ for(const pic of o.pictures||[]){const[px,pz,ry,col]=pic;const f=TM(px,0,pz,1,1,1,0,ry,0);tbx(WD,'#c9a24a',L(f,0,2.6,.02,1.3,1,.06,0,0,0),1.3,1,.06,1,null,true);b.add(GB.boxc,col,L(f,0,2.6,.06,1.08,.78,.02),shadeHex(col,.6));b.add(GB.boxc,'#e8d9a8',L(f,.2,2.48,.072,.3,.22,.01));}
+ if(o.herbs){for(let i=0;i<7;i++){const x=cx-w*.3+i*w*.1,z=cz+d*.1;b.add(GB.cyl,'#7a6a3a',TM(x,h-1.6,z,.02,.5,.02));b.add(GB.cone8,i%2?'#5f7a3a':'#8a7a4a',TM(x,h-1.95,z,.16,.45,.16,PI,0,0));}}
+ for(const br of o.barrels||[]){b.add(GB.cyl,'#7a5230',TM(br[0],0,br[1],.45,1.05,.45),'#5a3a20');for(const y of[.18,.85])b.add(GB.cyl,'#3a3a3a',TM(br[0],y,br[1],.47,.06,.47));addCol(br[0],br[1],.5);}
+ if(o.rug){const[rx,rz,rw,rd]=o.rug;b.add(GB.box,'#7a2a2a',TM(rx,.05,rz,rw,.02,rd));b.add(GB.box,'#c9a24a',TM(rx,.055,rz,rw-.3,.02,rd-.3));b.add(GB.box,'#2f4f6a',TM(rx,.06,rz,rw-.7,.02,rd-.7));b.add(GB.box,'#7a2a2a',TM(rx,.065,rz,rw-1.3,.02,rd-1.3));}
+ for(const k in T){if(!T[k].p.length)continue;const m=new THREE.Mesh(T[k].geometry(),HTXM[k]);m.castShadow=true;m.receiveShadow=true;scene.add(m);}
+ if(b.p.length){const m=new THREE.Mesh(b.geometry(),archMat);m.castShadow=true;m.receiveShadow=true;scene.add(m);}}
 function roomShell(b,wb,R0){const{cx,cz,w,d,h,wall,floor}=R0;
  b.add(GB.box,floor,TM(cx,-.6,cz,w,.6,d));for(let x=-w/2+.5;x<w/2;x+=1)b.add(GB.box,shadeHex(floor,.88+Math.abs(Math.sin(x*12.9))*.22),TM(cx+x,0,cz,.94,.03,d-.1));
  b.add(GB.box,wall,TM(cx,0,cz-d/2,w+.4,h,.4),shadeHex(wall,.78));b.add(GB.box,wall,TM(cx,0,cz+d/2,w+.4,h,.4),shadeHex(wall,.78));b.add(GB.box,wall,TM(cx-w/2,0,cz,.4,h,d),shadeHex(wall,.78));b.add(GB.box,wall,TM(cx+w/2,0,cz,.4,h,d),shadeHex(wall,.78));
@@ -2662,12 +2719,14 @@ function buildHouseRoom(cx,cz){const b=new VB(),wb=new VB();const R0={cx,cz,w:12
  b.add(GB.box,'#7a3a2a',TM(cx,0,cz+1,4.4,.04,3.2));b.add(GB.box,'#c9a24a',TM(cx,0,cz+1,4.6,.03,3.4));
  b.add(GB.cyl,'#7a5230',TM(cx+5,0,cz-4.8,.5,1.2,.5),'#5a3a20');addCol(cx+5,cz-4.8,.6);
  R0.homeTown=TOWNS[0];R0.resident=seat(R0,cx+2.4,cz-1.6,0);
+ roomDress(R0,{fire:[cx-2.5,cz-6+.45,2.6],dresser:[cx+2.5,cz-5.4,0],pictures:[[cx-5.78,cz-1.5,PI/2,'#6a8a5a'],[cx+5.78,cz-3.2,-PI/2,'#7a6a9a']],herbs:true,barrels:[[cx-5.2,cz+5.2],[cx-4.2,cz+5.3]],cloth:'#7a3a2a'});
  finishRoom(b,wb,R0);ROOMS.house=R0;}
 function buildTavern(cx,cz){const b=new VB(),wb=new VB();const R0={cx,cz,w:20,d:16,h:6,wall:'#cdb892',floor:'#7a5a3a',light:2.2,cam:7,name:dr=>`${dr.town.name} inn`,title:dr=>`The common room of the ${dr.town.name} inn. It smells of ale and toasted cheese.`};roomShell(b,wb,R0);
  const bz=cz-8+3.2;b.add(GB.box,'#6a4426',TM(cx-3.5,0,bz,9,1.3,1),'#4a2e18');b.add(GB.box,'#8a5a32',TM(cx-3.5,1.3,bz,9.4,.12,1.3));for(let i=0;i<10;i++)addCol(cx-8+i,bz,.6);
  for(const y of[1.6,2.5,3.4]){b.add(GB.box,'#5a3a20',TM(cx-3.5,y,cz-8+.5,9,.1,.6));for(let i=0;i<12;i++)b.add(GB.cyl,['#3a6a3a','#6a2a2a','#2a3a6a','#8a6a2a'][i%4],TM(cx-7.7+i*.75,y+.1,cz-8+.5,.12,.45,.12));}
  for(let i=0;i<3;i++){b.add(GB.cyl,'#7a5230',TM(cx-9+.8,0,cz-2+i*1.3,.55,1.3,.55),'#5a3a20');addCol(cx-9+.8,cz-2+i*1.3,.6);}
  fireplace(b,cx+5.5,cz-8+.6,6);chandelier(b,cx,4.6,cz,1.4);
+ roomDress(R0,{fire:[cx+5.5,cz-8+.45,3.2],pictures:[[cx-9.78,cz+3,PI/2,'#7a5a3a'],[cx+9.78,cz+3,-PI/2,'#4a6a8a'],[cx-2,cz+7.78,PI,'#8a6a3a']],herbs:true,barrels:[[cx+9,cz+6.6],[cx+8,cz+6.8],[cx+9.1,cz+5.6]],cloth:'#6a2a22',wood:'#6a4426',floor:'#8a6440',rug:[cx,cz+3.4,5,3.4]});
  R0.homeTown=TOWNS[0];const kp=new NPC({kind:'innkeeper',k:-1,x:cx-3.5,z:bz-1.1,name:mouseName(),coat:'#6b5a43',trim:'#efe6d2',hat:'none',apron:true,still:true,yaw:0,yaw0:0});kp.town=TOWNS[0];R0.keeper=kp;
  [[cx-5.5,cz+1.5],[cx+5,cz+1.5],[cx-5.5,cz+5.2],[cx+5,cz+5.2]].forEach((p,i)=>{table(b,p[0],p[1],2.4,1.3);bench(b,p[0],p[1]-1.1,2.2);bench(b,p[0],p[1]+1.1,2.2);b.add(GB.cyl,'#c9b48a',TM(p[0]-.4,1.08,p[1],.12,.3,.12));candle(b,p[0]+.5,1.08,p[1]);
   if(i<3)seat(R0,p[0]+(i%2?.5:-.5),p[1]-1.1,0);if(i!==1)seat(R0,p[0],p[1]+1.1,PI);});
@@ -5833,6 +5892,7 @@ function buildMyHouse(cx,cz){const b=new VB(),wb=new VB();const R0={cx,cz,w:14,d
  b.add(GB.box,'#6a4426',TM(cx-6.1,0,cz+1.5,.95,.9,1.7),'#4a2e18');for(const z of[-.55,.55])b.add(GB.box,'#d9b24a',TM(cx-6.1,0,cz+1.5+z,1,.95,.1));b.add(GB.box,'#d9b24a',TM(cx-5.62,.45,cz+1.5,.05,.18,.25));addCol(cx-6.1,cz+1.5,1);
  table(b,cx-.5,cz-.6,2.4,1.4);bench(b,cx-.5,cz-1.7,2.2);bench(b,cx-.5,cz+.5,2.2);candle(b,cx,1.14,cz-.5);
  b.add(GB.box,'#6a4426',TM(cx+5.2,0,cz+4.6,2,1,1),'#4a2e18');b.add(GB.box,'#7a2a2a',TM(cx+5,1,cz+4.6,.6,.12,.45));b.add(GB.cyl,'#1a1a1a',TM(cx+5.6,1,cz+4.5,.08,.14,.08));addCol(cx+5.2,cz+4.6,1.1);
+ roomDress(R0,{fire:[cx-3,cz-6.4-.15,2.8],dresser:[cx+1.2,cz-6.4,0],pictures:[[cx-6.78,cz-1,PI/2,'#5a7a9a'],[cx+6.78,cz,-PI/2,'#9a7a4a'],[cx+2.2,cz+6.78,PI,'#6a8a5a']],herbs:false,barrels:[[cx+6.1,cz+1.4]],cloth:'#2f4f7a',floor:'#a37e58'});
  R0.spots=[{x:cx+3.1,z:cz-4,type:'bed',label:'Sleep in your bed (free)'},{x:cx-4.8,z:cz+1.5,type:'chest',label:'Open your storage chest'},{x:cx+3.7,z:cz+4.6,type:'decor',label:'Decorate your house'}];
  R0.decor={};const D=(id,fn,extra)=>{const v=new VB();fn(v);const g=new THREE.Group();const m=new THREE.Mesh(v.geometry(),archMat);m.castShadow=true;g.add(m);if(extra)extra(g);g.visible=false;scene.add(g);R0.decor[id]=g;};
  D('rug',v=>{v.add(GB.cylc,'#c9a24a',TM(cx-.5,.02,cz+2.6,2.8,.03,2));v.add(GB.cylc,'#7a2a3a',TM(cx-.5,.04,cz+2.6,2.5,.03,1.75));v.add(GB.cylc,'#2f4f6a',TM(cx-.5,.06,cz+2.6,1.2,.03,.8));});

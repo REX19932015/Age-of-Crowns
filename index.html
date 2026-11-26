@@ -818,7 +818,7 @@ function planTowns(){
    if(site)addTown(name,p.k,'village',site.x,site.z);
   });
   const boroughs=['Hearthstead','Oakcross','Amberfield','Greyhaven'];
-  if(p.k===1){const rs=remoteSite(1,TSIZE.village);if(rs){const t=addTown('Oakcross',1,'village',rs.x,rs.z);t.remote=true;}}
+  if(p.k===1){const rs=oakSite();if(rs){const t=addTown('Oakcross',1,'village',rs.x,rs.z);t.remote=true;}}
   else{const borough=autoSite(p.k,900,2140,TSIZE.town);
   if(borough)addTown(boroughs[p.k],p.k,'town',borough.x,borough.z);}
  });
@@ -912,7 +912,7 @@ function scnPlan(){
  const KC={x:250,z:3350};const isl=[];for(let t=0;t<400&&isl.length<17;t++){const a=r()*TAU,d=Math.sqrt(r())*620;const x=KC.x+Math.cos(a)*d,z=KC.z+Math.sin(a)*d;const rad=20+r()*44;if(isl.some(q=>Math.hypot(q.x-x,q.z-z)<(q.r+rad)*.95))continue;isl.push({x,z,r:rad,H:22+rad*.75+r()*22,ph:r()*9});}
  SCN.karst={x:KC.x,z:KC.z,R:820,isl};
  // the Thousand Spires: sandstone pillars on the Verdantia–Pinehallow border (meshes, planned at build time)
- SCN.spires={x:-900,z:1200,R:430,list:[]};
+ SCN.spires={x:-900,z:1200,R:430,lift:78,list:[]};
  // Hollowroar Falls: a horseshoe canyon in western Pinehallow that opens to the sea
  {const C={x:-3720,z:-500};let best=null;for(let i=0;i<48;i++){const a=i/48*TAU;for(let d=40;d<900;d+=20){if(rawHeight(C.x+Math.cos(a)*d,C.z+Math.sin(a)*d)<-2){if(!best||d<best.d)best={a,d};break;}}}
   const a=best?best.a:PI;SCN.canyon={x:C.x,z:C.z,dx:Math.cos(a),dz:Math.sin(a),Rb:105,W:34,L:(best?best.d:400)+120,lift:58};}
@@ -928,6 +928,7 @@ function scnAtollW(a,x,z){const A=SCN.atoll;let w=30+30*fbm(Math.cos(a)*2.2+5,Ma
 function scnApply(x,z,h){if(!SCN||!SCN.on)return h;
  {const K0=SCN.karst;const dx=x-K0.x,dz=z-K0.z;if(dx*dx+dz*dz<K0.R*K0.R*1.21){const dc=Math.sqrt(dx*dx+dz*dz);if(h<-1.5)h=Math.max(h,lerp(-2.4-1.2*fbm(x*.02,z*.02,2),h,smooth(K0.R*.72,K0.R*1.08,dc)));
   for(const q of K0.isl){const ex=x-q.x,ez=z-q.z;if(Math.abs(ex)>q.r*1.4||Math.abs(ez)>q.r*1.4)continue;const a=Math.atan2(ez,ex);const wob=1+.16*Math.sin(a*3+q.ph)+.1*Math.sin(a*5-q.ph*1.7);const dn=Math.hypot(ex,ez)/(q.r*wob);if(dn<1.12){const top=q.H*(.9+.18*fbm(x*.05,z*.05,2))*(1-.25*dn*dn);const wall=1-smooth(.86,1.02,dn);h=Math.max(h,lerp(h,top,wall));}}}}
+ {const S=SCN.spires;const dx=x-S.x,dz=z-S.z;if(Math.abs(dx)<S.R*2&&Math.abs(dz)<S.R*2){const d=Math.hypot(dx,dz);const a=Math.atan2(dz,dx);const Re=S.R*(1+.09*Math.sin(a*3+1)+.05*Math.sin(a*7-2));if(d<Re*1.95){let lift=S.lift*smooth(Re*.985,Re*1.05,d)*(1-smooth(Re*1.4,Re*1.95,d));if(lift>0){const gap=Math.min(ROADS.length?smooth(16,52,roadD(x,z)):1,smooth(14,42,riverD(x,z)));h+=lift*gap*(.82+.36*fbm(x*.012+4,z*.012,2));}}}}
  {const C=SCN.canyon;const dx=x-C.x,dz=z-C.z;if(Math.abs(dx)<720&&Math.abs(dz)<720){const u=dx*C.dx+dz*C.dz,v=-dx*C.dz+dz*C.dx;const rb=C.Rb*(1+.06*Math.sin(Math.atan2(v,u)*7));const dB=Math.hypot(u,v)-rb;const dCh=(u>0&&u<C.L)?Math.abs(v)-C.W*(1+u/C.L*.8):1e9;const s=Math.min(dB,dCh);
   const lift=C.lift*(1-smooth(40,420,s))*(1-smooth(C.L*.55,C.L*.95,u))*(.85+.3*fbm(x*.01,z*.01,2));const out=h+(s>0?lift:0);const f=1-smooth(-2,9,s);const jag=(fbm(x*.06,z*.06,2)-.5)*5*(1-f);h=lerp(out+jag,-4.5,f);}}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h<2.9){const q=scnIceQ(x,z);const W=scnIceW(q.t,x,z);if(q.d<W){const n=fbm(x*.02,z*.02,3);let ih=2.9+n*.5;if(q.t<.22)ih+=6.5*(1-q.t/.22)*(.7+.6*n);const crk=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5);if(crk<.018)ih-=.9;ih+=Math.max(0,.04-Math.abs(fbm(x*.011-2,z*.011+6,2)-.5))*30;h=Math.max(h,ih);}}}
@@ -936,9 +937,10 @@ function scnApply(x,z,h){if(!SCN||!SCN.on)return h;
  return h;}
 // colours painted over the terrain for the new places: [r,g,b,mask]
 function scnCol(x,z,h,slope){if(!SCN||!SCN.on)return null;
- {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h>2.5&&h<14){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z)+4){const n=vnoise(x*.05,z*.05),c=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5)<.022;return c?[.46,.66,.78,1]:[lerp(.86,.95,n),lerp(.92,.97,n),lerp(.96,1,n),1];}}}
+ {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h>2.2&&h<34){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z)+10){const n=vnoise(x*.05,z*.05),c=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5)<.022;return c?[.46,.66,.78,1]:[lerp(.86,.95,n),lerp(.92,.97,n),lerp(.96,1,n),1];}}}
  {const A=SCN.atoll;const d=Math.hypot(x-A.x,z-A.z);if(d<A.R*1.2&&h>-.2){const t=smooth(1.4,3.6,h);return[lerp(.93,.3,t),lerp(.87,.55,t),lerp(.72,.22,t),1];}}
  {const K0=SCN.karst;const dc=Math.hypot(x-K0.x,z-K0.z);if(dc<K0.R&&h>1.2){const rk=smooth(.18,.42,slope);return[lerp(.2,.32,rk),lerp(.42,.33,rk),lerp(.14,.3,rk),1];}}
+ {const S=SCN.spires;const dd=Math.hypot(x-S.x,z-S.z);if(dd<S.R*2.05){if(slope>.28){const b=Math.sin(h*.35+fbm(x*.01,z*.01,2)*2)*.5+.5;return[lerp(.5,.66,b),lerp(.45,.56,b),lerp(.37,.44,b),1];}if(h>18){const v=fbm(x*.03,z*.03,2);return[lerp(.17,.26,v),lerp(.38,.47,v),lerp(.12,.16,v),1-smooth(S.R*1.8,S.R*2.05,dd)];}}}
  {const C=SCN.canyon;const dx=x-C.x,dz=z-C.z;if(Math.abs(dx)<600&&Math.abs(dz)<600&&slope>.3&&h>-1){const b=Math.sin(h*.42+fbm(x*.01,z*.01,2)*2)*.5+.5;return[lerp(.46,.62,b),lerp(.4,.5,b),lerp(.34,.4,b),smooth(.3,.5,slope)];}}
  return null;}
 function scnName(x,z){if(!SCN||!SCN.on)return null;
@@ -950,6 +952,8 @@ function scnName(x,z){if(!SCN||!SCN.on)return null;
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&heightAt(x,z)>2.4){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z))return 'The Rimeshelf';}}
  return null;}
 function scnUnclaimed(x,z){return !!(SCN&&SCN.on&&SCN.atoll&&Math.hypot(x-SCN.atoll.x,z-SCN.atoll.z)<SCN.atoll.R*1.35);}
+// Oakcross: a lone village on the coast beside the Rimeshelf, near where it always stood
+function oakSite(){const A={x:-2242,z:-2398};let best=null,bs=1e9;for(let r=0;r<=160;r+=8)for(let i=0;i<(r?16:1);i++){const a=i/16*TAU;const x=A.x+Math.cos(a)*r,z=A.z+Math.sin(a)*r;const h=rawHeight(x,z);if(h<4||h>28)continue;let bad=false;for(const s0 of[[20,0],[-20,0],[0,20],[0,-20]])if(Math.abs(rawHeight(x+s0[0],z+s0[1])-h)>6){bad=true;break;}if(bad)continue;const sc=r+Math.abs(h-10)*3;if(sc<bs){bs=sc;best={x,z};}}return best||A;}
 // a remote, roadless spot for a village: as far as possible from every other settlement
 function remoteSite(ki,rad){let best=null,bs=-1;const rr2=mulberry(808);const caps=[{x:0,z:-1280*WSC},{x:0,z:1120*WSC},{x:3000,z:0},{x:-3700,z:600}];
  for(let i=0;i<9000;i++){const a=K[ki].ang+(rr2()-.5)*2.2,r0=(500+rr2()*2300)*WSC;const x=Math.cos(a)*r0,z=Math.sin(a)*r0;const h=rawHeight(x,z);if(h<4||h>40)continue;if(owner(x,z)!==ki)continue;if(wonderBlocked(x,z,120))continue;
@@ -970,11 +974,11 @@ function scnVeg(t,x,y,z,s){const L0=VEGLS[t];if(!L0)return;L0.push({x,y,z,s,ry:r
 function scnClearVeg(test,keepTypes){const LS=VEGLS;for(const k in LS){if(keepTypes&&keepTypes.includes(k))continue;LS[k]=LS[k].filter(it=>{if(test(it.x,it.z)){if(it.col)delCol(it.col);return false;}return true;});}}
 function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND=['#9c8f78','#76695a','#3f5e26','#4a4038'],KARST=['#4a4c48','#666760','#35592a','#2a2b27'],ATR=['#2e2f2d','#45463f','#3d5a28','#1d1e20'];
  // ---- the Thousand Spires
- {const S=SCN.spires;const r2=mulberry(1717);let n=0;for(let t=0;t<2600&&n<78;t++){const a=r2()*TAU,d=Math.sqrt(r2())*S.R;const x=S.x+Math.cos(a)*d,z=S.z+Math.sin(a)*d;const g=heightAt(x,z);if(g<2.5)continue;const rad=5+r2()*7;if(onWay(x,z,rad+8)||riverD(x,z)<rad+10)continue;if(TOWNS.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+40))continue;if(S.list.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+rad+7))continue;
+ {const S=SCN.spires;const r2=mulberry(1717);let n=0;for(let t=0;t<2600&&n<78;t++){const a=r2()*TAU,d=Math.sqrt(r2())*S.R*.84;const x=S.x+Math.cos(a)*d,z=S.z+Math.sin(a)*d;const g=heightAt(x,z);if(g<2.5)continue;const rad=5+r2()*7;if(onWay(x,z,rad+8)||riverD(x,z)<rad+10)continue;if(TOWNS.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+40))continue;if(S.list.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+rad+7))continue;
    const H=(46+r2()*70)*(1.15-.45*d/S.R);const tp=scnRock(P,Cc,I,x,g,z,rad,H,9000+n,SAND);const c=addCol(x,z,rad*.92);S.list.push({x,z,r:rad,top:tp.top});n++;
    const nt=1+Math.floor(rad/4);for(let k=0;k<nt;k++){const aa=r2()*TAU,dd=r2()*rad*.45;scnVeg(r2()<.6?'pine':'broad',x+Math.cos(aa)*dd,tp.top-.4,z+Math.sin(aa)*dd,.45+r2()*.35);}
    for(let k=0;k<4;k++){const aa=r2()*TAU,yy=g+H*(.3+r2()*.6);scnVeg(r2()<.5?'jbush':'fern',x+Math.cos(aa)*rad*.82,yy,z+Math.sin(aa)*rad*.82,.7+r2()*.6);}}
-  for(let t=0;t<900;t++){const a=r2()*TAU,d=Math.sqrt(r2())*S.R*1.05;const x=S.x+Math.cos(a)*d,z=S.z+Math.sin(a)*d;const g=heightAt(x,z);if(g<2||onWay(x,z,4)||S.list.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+2))continue;const q=r2();scnVeg(q<.45?'jungle':q<.7?'broad':q<.85?'jbush':'fern',x,g-.25,z,.7+r2()*.6);}
+  for(let t=0;t<900;t++){const a=r2()*TAU,d=Math.sqrt(r2())*S.R*.88;const x=S.x+Math.cos(a)*d,z=S.z+Math.sin(a)*d;const g=heightAt(x,z);if(g<2||onWay(x,z,4)||S.list.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+2))continue;const q=r2();scnVeg(q<.45?'jungle':q<.7?'broad':q<.85?'jbush':'fern',x,g-.25,z,.7+r2()*.6);}
   LANDMARKS.push({name:'the Thousand Spires',x:S.x,z:S.z,r:S.R});}
  // ---- the Jade Teeth
  {const K0=SCN.karst;const r2=mulberry(3131);scnClearVeg((x,z)=>Math.hypot(x-K0.x,z-K0.z)<K0.R);

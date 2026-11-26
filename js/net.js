@@ -195,7 +195,7 @@
     tradeEnd(m) { const wasOpen = !!N.trade; N.trade = null; if (wasOpen) A().closePanel(); toast(m.msg, m.done ? 'gold' : ''); if (m.done) A().save(true); },
     houseOk(m) {
       const p = P(); const i = A().DOORS.findIndex(d => d.room === 'house' && houseId(d) === m.id);
-      if (i >= 0) { p.house = i; A().updateHouseMarker(); }
+      if (i >= 0) { p.houses = (p.houses || []).filter(q => q !== i); p.houses.push(i); p.house = i; A().updateHouseMarker(); }
       N.props.set(m.id, { id: m.id, kind: 'house', mine: true, owner: N.you.name });
       if (m.old) N.props.delete(m.old);
       try { A().sfxChime && A().sfxChime(); } catch (e) {}
@@ -262,9 +262,9 @@
     if (hadMusket !== !!p.items.musket) { try { A().outfit(); } catch (e) {} }
   }
   function syncHouse() {
-    const p = P(); const mine = [...N.props.values()].find(x => x.mine && x.kind === 'house');
-    const idx = mine ? A().DOORS.findIndex(d => d.room === 'house' && houseId(d) === mine.id) : -1;
-    if (p.house !== idx) { p.house = idx; try { A().updateHouseMarker(); } catch (e) {} }
+    const p = P(); const D = A().DOORS; const ids = new Set([...N.props.values()].filter(x => x.mine && x.kind === 'house').map(x => x.id));
+    const own = []; D.forEach((d, i) => { if (d.room === 'house' && ids.has(houseId(d))) own.push(i); });
+    const key = own.join(','); if ((p.houses || []).join(',') !== key || (own.length ? !own.includes(p.house) : p.house !== -1)) { p.houses = own; p.house = own.length ? (own.includes(p.house) ? p.house : own[own.length - 1]) : -1; try { A().updateHouseMarker(); } catch (e) {} }
   }
 
   // ------------------------------------------------------------------ other players in the world

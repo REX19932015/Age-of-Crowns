@@ -8,6 +8,10 @@
 (function () {
   'use strict';
   const CFG = window.AOC_CONFIG || {};
+  // ?sproket: this browser plays Sproket, the tester bot (no account: an admin approves the browser once)
+  const SPROKET = /[?&#]sproket\b/i.test(location.search + location.hash);
+  const SKEY = 'aoc-sproket-key';
+  const skey = () => { try { return localStorage.getItem(SKEY) || ''; } catch (e) { return ''; } };
   const ONLINE = !!(CFG.SUPABASE_URL && CFG.SUPABASE_PUBLISHABLE_KEY && CFG.SERVER_URL);
   if (!ONLINE) { console.info('[Age of Crowns] Online play is off. Fill in js/config.js to turn it on.'); return; }
 
@@ -136,19 +140,21 @@
   async function logout() {
     try { if (inGame()) A().save(true); } catch (e) {}
     N.noRetry = true;
-    setTimeout(async () => { try { if (N.ws) N.ws.close(1000); } catch (e) {} try { await N.sb.auth.signOut(); } catch (e) {} location.reload(); }, 600);
+    setTimeout(async () => { try { if (N.ws) N.ws.close(1000); } catch (e) {} if (!SPROKET) try { await N.sb.auth.signOut(); } catch (e) {} location.reload(); }, 600);
   }
 
   // ------------------------------------------------------------------ connection
   async function connect() {
     if (N.ws && N.ws.readyState <= 1) return;
-    const { data } = await N.sb.auth.getSession();
-    N.session = data && data.session;
-    if (!N.session) { if (!N.entered) showSignIn(); return; }
-    if (!N.entered) showSignedIn('Signed in as ' + (N.session.user && N.session.user.email || 'you') + '. Connecting to the realm…');
+    if (!SPROKET) {
+      const { data } = await N.sb.auth.getSession();
+      N.session = data && data.session;
+      if (!N.session) { if (!N.entered) showSignIn(); return; }
+    }
+    if (!N.entered) showSignedIn(SPROKET ? 'Connecting to the realm as Sproket, the tester bot…' : 'Signed in as ' + (N.session.user && N.session.user.email || 'you') + '. Connecting to the realm…');
     let ws; try { ws = new WebSocket(CFG.SERVER_URL); } catch (e) { return failConnect('Bad SERVER_URL in js/config.js.'); }
     N.ws = ws;
-    ws.onopen = () => { N.retry = 0; ws.send(JSON.stringify({ t: 'hello', token: N.session.access_token, v: 1 })); };
+    ws.onopen = () => { N.retry = 0; ws.send(JSON.stringify(SPROKET ? { t: 'hello', sproket: true, key: skey(), v: 1 } : { t: 'hello', token: N.session.access_token, v: 1 })); };
     ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } const h = RX[m.t]; if (h) { try { h(m); } catch (err) { console.warn('[net]', m.t, err); } } else if (window.AOC_SEASONS) { try { window.AOC_SEASONS.rx(m); } catch (err) { console.warn('[seasons]', m.t, err); } } };
     ws.onclose = ev => {
       const was = N.ready; N.ready = false; clearRemotes(); setLink(false);
@@ -168,6 +174,16 @@
     wregs(m) { if (window.AOC_WORLD) window.AOC_WORLD.regs(m); },
     wnews(m) { if (window.AOC_WORLD) window.AOC_WORLD.news(m.items); },
     wwin(m) { if (window.AOC_WORLD) window.AOC_WORLD.win(m); },
+    // Sproket sign-in: this browser waits for an admin; admins get the question
+    sproketWait(m) { authMsg(`This browser asks to play Sproket. An admin must approve code ${m.code} in their game.${m.admins ? '' : ' No admin is online right now: the request waits up to 5 minutes.'}`); },
+    sproketKey(m) { try { localStorage.setItem(SKEY, m.key); } catch (e) {} },
+    sproketAsk(m) {
+      N.sproketAsk = m.nid;
+      A().openPanel('Sproket sign-in', 'Code ' + m.code, `<p>A browser is asking to play as <b>Sproket</b>, the tester bot. It should be showing the code <b>${esc(m.code)}</b>.</p><p class="aocsmall">Approve only if you know who it is (for example Claude, when you asked it to play). Approved browsers keep a key and come straight back next time; <i>/sproket keys</i> signs them all out.</p>`, [
+        { label: 'Approve', primary: true, fn: () => { send({ t: 'sproketAnswer', nid: m.nid, ok: true }); N.sproketAsk = null; A().closePanel(); } },
+        { label: 'Deny', fn: () => { send({ t: 'sproketAnswer', nid: m.nid, ok: false }); N.sproketAsk = null; A().closePanel(); } }]);
+    },
+    sproketAsked(m) { if (N.sproketAsk === m.nid) { N.sproketAsk = null; A().closePanel(); toast('Another admin answered the Sproket request.'); } },
     wroster(m) {
       N.wr = m; if (window.AOC_WORLD && window.AOC_WORLD.roster) window.AOC_WORLD.roster(m);
       const sq = m.me && m.me.sq; const names = new Set(); if (sq) for (const list of Object.values(m.cos)) for (const e of list) if (e[3] === sq && (!N.you || e[0] !== N.you.name)) names.add(e[0]);
@@ -181,7 +197,7 @@
         { label: 'Decline', fn: () => { send({ t: 'wcmd', op: 'sqAcc', sq: m.sq, ok: false }); A().closePanel(); } }]);
     },
     auth(m) {
-      if (!m.ok) { N.noRetry = true; N.sb.auth.signOut().catch(() => {}); if (!N.entered) showSignIn(m.msg); else toast(m.msg, 'bad'); return; }
+      if (!m.ok) { N.noRetry = true; if (SPROKET) { if (!N.entered) authMsg(m.msg, true); else toast(m.msg, 'bad'); return; } N.sb.auth.signOut().catch(() => {}); if (!N.entered) showSignIn(m.msg); else toast(m.msg, 'bad'); return; }
       HOOK.online = true; N.you = Object.assign(N.you || {}, { id: m.id, admin: m.admin });
       N.needCharacter = !!m.needCharacter;
       if (N.needCharacter && !N.entered) showCreate();

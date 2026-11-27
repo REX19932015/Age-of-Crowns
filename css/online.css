@@ -108,3 +108,13 @@ body.aoc-home .ssnhud,body.aoc-home #aocChat,body.aoc-home #aocBar,body.aoc-home
 #panel:has(.aocadmt) #pbody{max-width:none;font-size:15px}
 .aocmil{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .aocmil .aocsm{flex:1 1 110px;min-width:0;padding:3px 6px;font-size:13px}
+/* the chain of command */
+.aocrk{flex:none;display:inline-block;vertical-align:middle}
+.aocrkhead{display:flex;gap:12px;align-items:center;margin:2px 0 6px}
+.aocrkchart{margin:6px 0}
+.aocrktier{border-left:4px solid var(--tc);padding:2px 0 2px 12px;margin:12px 0}
+.aocrktn{font-weight:700;color:var(--tc);text-transform:uppercase;letter-spacing:.07em;font-size:12px;margin-bottom:2px}
+.aocrkrow{display:flex;gap:12px;align-items:flex-start;padding:7px 0;border-top:1px solid color-mix(in srgb,var(--edge) 35%,transparent)}
+.aocrkrow:first-of-type{border-top:0}
+.aocrkt{min-width:0}
+.aoccard.aocmine{border-color:var(--gold);box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 40%,transparent) inset}

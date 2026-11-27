@@ -929,36 +929,55 @@ function scnPlan(){
  {const A={x:-3480,z:-700,R:720,H:215,gorges:[]};const r=mulberry(2929);for(const g0 of[[-2.6,.45],[-.9,-.2]]){const a=g0[0];const pts=[];for(let i=0;i<=10;i++){const u=i/10*2-1;const off=Math.sin(u*3.1+g0[1]*5)*90+(r()-.5)*50;pts.push({x:A.x+Math.cos(a)*u*A.R*1.15-Math.sin(a)*off,z:A.z+Math.sin(a)*u*A.R*1.15+Math.cos(a)*off});}A.gorges.push(pts);}
   // Banff-style ranges: long tilted limestone slabs, all striking the same way, gentle dip slope on one side and a sheer stepped face on the other
   A.ms=[];const r3=mulberry(3030);for(let t=0;t<600&&A.ms.length<8;t++){const a=r3()*TAU,d=Math.sqrt(r3())*A.R*.6;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;if(A.ms.some(m=>Math.hypot(m.x-x,m.z-z)<230))continue;const th=.62+(r3()-.5)*.4;
-   A.ms.push({x,z,c:Math.cos(th),s:Math.sin(th),L:250+r3()*170,Wd:240+r3()*130,Ws:50+r3()*30,H:(170+r3()*90)*(1-.25*d/A.R),side:r3()<.5?1:-1,ph:r3()*10});}
+   A.ms.push({x,z,c:Math.cos(th),s:Math.sin(th),L:250+r3()*170,Wd:240+r3()*130,Ws:50+r3()*30,H:(150+r3()*60)*(1-.2*d/A.R),side:r3()<.5?1:-1,ph:r3()*10});}
+  {const r5=mulberry(5151);let best=null,bs=-1;for(let t=0;t<300;t++){const a=r5()*TAU,d=Math.sqrt(r5())*A.R*.4;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;let gd=1e9;for(const G of A.gorges)gd=Math.min(gd,scnPolyD(x,z,G));if(gd>bs){bs=gd;best={x,z};}}
+   A.peak={x:best.x,z:best.z,H:345,R:Math.min(300,bs*1.25),ph:r5()*6};}
   A.lakes=[];SCN.alps=A;}
  // Cinderbowl Isle: a lone volcano in the northern sea with a deep blue crater lake, the Moonbowl
  SCN.crater={x:-109,z:-6131,R:400,Rc:165,rim:74,lake:41,cone:{x:-109+38,z:-6131-30}};
  SCN.wl=[];
  SCN.on=false;SCN.ready=true;}// switched on right after the towns are planned, so existing settlements keep their places
-function scnAlpsH(x,z){const A=SCN.alps;let best=0,sc=0;for(const m of A.ms){const ex=x-m.x,ez=z-m.z;const u=ex*m.c+ez*m.s;if(u>m.L||u<-m.L)continue;const v=(-ex*m.s+ez*m.c)*m.side;if(v>m.Wd||v<-m.Ws*1.6)continue;
-  let g=1-(u/m.L)*(u/m.L);g=Math.pow(g,.38);const crest=1-.1*Math.abs(Math.sin(u*.012+m.ph))-.12*fbm(u*.009+m.ph,m.ph*2,2);
-  let f,scarp=0;if(v>=0){f=1-v/m.Wd;f=f*(.9+.1*f);}else{const q=-v/m.Ws;scarp=1;f=q<1?1-Math.pow(q,.55)*.8:Math.max(0,.2*(1-(q-1)/.6));}
-  const hm=m.H*crest*g*f;if(hm>best){best=hm;sc=scarp;}}
- if(best>4){const st=10.5,tq=best/st,fr=tq-Math.floor(tq);const stepped=(Math.floor(tq)+smooth(.05,.55,fr))*st;best=lerp(best,stepped,sc?.6:.22);best+=4*(fbm(x*.05,z*.05,2)-.5)*Math.min(1,best/30);}
+function scnSmax(a,b,k){const h=clamp(.5+.5*(b-a)/k,0,1);return lerp(a,b,h)+k*h*(1-h);}
+// long rounded ridges: tilted slabs with a softened crest, joined smoothly where ranges meet, and one great snow-capped summit
+function scnAlpsH(x,z){const A=SCN.alps;let best=0;const c=26;
+ for(const m of A.ms){const ex=x-m.x,ez=z-m.z;const u=ex*m.c+ez*m.s;if(u>m.L||u<-m.L)continue;const v=(-ex*m.s+ez*m.c)*m.side;if(v>m.Wd||v<-m.Ws*1.8)continue;
+  let g=1-(u/m.L)*(u/m.L);g=g*g*(3-2*g);g=Math.pow(g,.55);const crest=.86+.14*fbm(u*.004+m.ph,m.ph*2,3);
+  const av=Math.sqrt(v*v+c*c)-c;let f;if(v>=0)f=1-av/m.Wd;else{const q=av/m.Ws;f=q<1?1-Math.pow(q,.8)*.78:Math.max(0,.22*(1-(q-1)/.8));}
+  if(f<=0)continue;const hm=m.H*crest*g*f;best=best>0?scnSmax(best,hm,22):hm;}
+ const P0=A.peak;if(P0){const cone=(cx,cz,H,R,ph)=>{const ex=x-cx,ez=z-cz;const d=Math.hypot(ex,ez);if(d>R*1.35)return 0;const a=Math.atan2(ez,ex);
+   const ar=(1+.32*Math.pow(Math.max(0,Math.cos(a*2+ph)),4)+.22*Math.pow(Math.max(0,Math.cos(a*3-ph*1.7)),6))*(1+.18*(fbm(x*.007+ph,z*.007-ph,3)-.5));
+   const dd=(Math.sqrt(d*d+28*28)-28)/(R*ar);return H*Math.pow(Math.max(0,1-dd),1.45);};
+  const ph1=cone(P0.x,P0.z,P0.H,P0.R,P0.ph);const sx=P0.x+Math.cos(P0.ph)*P0.R*.38,sz=P0.z+Math.sin(P0.ph)*P0.R*.38;const ph2=cone(sx,sz,P0.H*.72,P0.R*.6,P0.ph+2);
+  if(ph1>0||ph2>0)best=scnSmax(best,scnSmax(ph1,ph2,26),30);}
+ if(best>4)best+=3*(fbm(x*.03,z*.03,2)-.5)*Math.min(1,best/40);
  return best;}
 function scnLakeD(L0,x,z){const a=Math.atan2(z-L0.z,x-L0.x);return Math.hypot(x-L0.x,z-L0.z)/(L0.r*(1+.13*Math.sin(a*3+L0.ph)+.07*Math.sin(a*5-L0.ph)));}
 // planned once the towns are fixed and before anything is built on the land
 function scnLate(){
  // Oakcross grows from a hamlet into a proper little town
  {const oc=TOWNS.find(q=>q.name==='Oakcross'&&q.remote);if(oc){oc.type='town';oc.r=TSIZE.town;}}
- // the Hollowroar river: one straight channel from the plunge pool to Hollow Lake, never running uphill
  {const C=SCN.canyon;const S={x:C.x+C.dx*C.Rb*.7,z:C.z+C.dz*C.Rb*.7};const W=[];let w=1e9,end=0;for(let u=0;u<900;u+=5){const x=S.x+C.dx*u,z=S.z+C.dz*u;const r=rawHeight(x,z);w=Math.min(w,r-2.6);W.push(w);if(r<-2.5){end++;if(end>4)break;}}
-  SCN.riv={x:S.x,z:S.z,dx:C.dx,dz:C.dz,W,len:(W.length-1)*5};}
+  SCN.riv={x:S.x,z:S.z,dx:C.dx,dz:C.dz,W,len:(W.length-1)*5,old:true,L1:0};SCN.glacier=null;}
  // glacial lakes in the Fangtooth valleys
- {const A=SCN.alps;const r4=mulberry(5757);const NM=['Lake Opaline','Silverfang Tarn','Glassmere','Moraine Tarn'];for(let t=0;t<4000&&A.lakes.length<4;t++){const a=r4()*TAU,d=Math.sqrt(r4())*A.R*.78;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;const r=58+r4()*42;
-  if(A.lakes.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+r+170))continue;let bad=false;for(let k=0;k<8&&!bad;k++){const aa=k/8*TAU;if(scnAlpsH(x+Math.cos(aa)*r,z+Math.sin(aa)*r)>9)bad=true;}if(bad||scnAlpsH(x,z)>4)continue;
+ {const A=SCN.alps;const r4=mulberry(5757);const NM=['Lake Opaline','Silverfang Tarn','Glassmere','Moraine Tarn'];for(let t=0;t<4000&&A.lakes.length<4;t++){const a=r4()*TAU,d=Math.sqrt(r4())*A.R*.85;const x=A.x+Math.cos(a)*d,z=A.z+Math.sin(a)*d;const r=58+r4()*42;
+  if(A.lakes.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+r+170))continue;let bad=false;for(let k=0;k<8&&!bad;k++){const aa=k/8*TAU;if(scnAlpsH(x+Math.cos(aa)*r,z+Math.sin(aa)*r)>40)bad=true;}if(bad||scnAlpsH(x,z)>22)continue;
   if(A.gorges.some(G=>scnPolyD(x,z,G)<r+50))continue;if(TOWNS.some(q=>Math.hypot(q.x-x,q.z-z)<q.r+r+140))continue;const h=rawHeight(x,z);if(h<7||h>45)continue;
   let mn=1e9,mx=-1e9;for(let k=0;k<12;k++){const aa=k/12*TAU;const hh=rawHeight(x+Math.cos(aa)*r*1.2,z+Math.sin(aa)*r*1.2);mn=Math.min(mn,hh);mx=Math.max(mx,hh);}if(mx-mn>16||mn<5)continue;
   A.lakes.push({x,z,r,y:Math.max(h,mn)+1.2,ph:r4()*9,name:NM[A.lakes.length]});}}
 }
 // after roads and woods exist: drop any glacial lake a road wanders into, and pick sites for the new wonders
-function scnLate2(){{const i=DEEPWOODS.findIndex(d=>d.name==='the Mossgloom');if(i>=0)DEEPWOODS.splice(i,1);}const A=SCN.alps;A.lakes=A.lakes.filter(L0=>!onWay(L0.x,L0.z,L0.r+18));try{scnWonderSites();}catch(e){console.error(e);}}
-function scnRivQ(x,z){const R=SCN.riv;const ex=x-R.x,ez=z-R.z;let u=ex*R.dx+ez*R.dz;const v=-ex*R.dz+ez*R.dx;if(u<-40||u>R.len+40)return null;let d=Math.abs(v);if(u<0){d=Math.hypot(u,v);u=0;}else if(u>R.len){d=Math.hypot(u-R.len,v);u=R.len;}const f=u/5,i=Math.min(R.W.length-2,Math.floor(f));return{d,w:lerp(R.W[i],R.W[i+1],f-i),u};}
+function scnLate2(){scnRivPlan();{const i=DEEPWOODS.findIndex(d=>d.name==='the Mossgloom');if(i>=0)DEEPWOODS.splice(i,1);}const A=SCN.alps;A.lakes=A.lakes.filter(L0=>!onWay(L0.x,L0.z,L0.r+18));try{scnWonderSites();}catch(e){console.error(e);}}
+function scnRivPlan(){
+ // the Hollowroar: born under a small glacier on the highland moor, it runs as one unbroken, gradually falling stream
+ // across the moor, down a steep cascade where the moor breaks, along the gorge and into Hollow Lake
+ {const C=SCN.canyon;const lipD=C.Rb+3,L1=200;const S={x:C.x-C.dx*(lipD+L1),z:C.z-C.dz*(lipD+L1)};
+  SCN.glacier={x:S.x-C.dx*95,z:S.z-C.dz*95,dx:C.dx,dz:C.dz,R:135};const R={x:S.x,z:S.z,dx:C.dx,dz:C.dz,L1,W:[],len:0};SCN.riv=null;const keep=SCN.on;SCN.on=true;const hs=[];let end=0;
+  for(let u=0;u<1400;u+=5){const m=scnRivMo(R,u);const x=S.x+C.dx*u-C.dz*m,z=S.z+C.dz*u+C.dx*m;const h=rawHeight(x,z);hs.push(h);if(h<-2.5){end++;if(end>4)break;}}
+  SCN.on=keep;const W=[];let w=1e9;for(const h of hs){w=Math.min(w,h-1.4);W.push(w);}for(let k=W.length-2;k>=0;k--)W[k]=Math.min(W[k],W[k+1]+1.35);
+  R.W=W;R.len=(W.length-1)*5;SCN.riv=R;}
+}
+function scnRivMo(R,u){if(R.old)return 0;return 16*Math.sin(u*.028+.6)*(1-smooth(R.L1-70,R.L1-10,u));}
+function scnRivQ(x,z){const R=SCN.riv;const ex=x-R.x,ez=z-R.z;let u=ex*R.dx+ez*R.dz;if(u<-40||u>R.len+40)return null;const v=-ex*R.dz+ez*R.dx-scnRivMo(R,clamp(u,0,R.len));let d=Math.abs(v);if(u<0){d=Math.hypot(u,v);u=0;}else if(u>R.len){d=Math.hypot(u-R.len,v);u=R.len;}const f=u/5,i=Math.min(R.W.length-2,Math.floor(f));return{d,w:lerp(R.W[i],R.W[i+1],f-i),u};}
 function scnPolyD(x,z,P0){let bd=1e9;for(let i=0;i<P0.length-1;i++){const a=P0[i],b=P0[i+1];const vx=b.x-a.x,vz=b.z-a.z,l2=vx*vx+vz*vz;const t=clamp(((x-a.x)*vx+(z-a.z)*vz)/l2,0,1);const d=Math.hypot(x-a.x-vx*t,z-a.z-vz*t);if(d<bd)bd=d;}return bd;}
 function scnIceQ(x,z){const I=SCN.ice,P0=I.pts;let bd=1e9,bt=0;for(let i=0;i<P0.length-1;i++){const a=P0[i],b=P0[i+1];const vx=b.x-a.x,vz=b.z-a.z,l2=vx*vx+vz*vz;const t=clamp(((x-a.x)*vx+(z-a.z)*vz)/l2,0,1);const d=Math.hypot(x-a.x-vx*t,z-a.z-vz*t);if(d<bd){bd=d;bt=(I.cum[i]+t*Math.sqrt(l2))/I.L;}}return{d:bd,t:bt};}
 function scnIceW(t,x,z){return lerp(SCN.ice.w0,SCN.ice.w1,t)*(.86+.28*fbm(x*.004+11,z*.004-5,3));}
@@ -987,7 +1006,8 @@ function scnApply(x,z,h){if(!SCN||!SCN.on)return h;
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h<2.9){const q=scnIceQ(x,z);const W=scnIceW(q.t,x,z);if(q.d<W){const n=fbm(x*.02,z*.02,3);let ih=2.9+n*.5;if(q.t<.22)ih+=6.5*(1-q.t/.22)*(.7+.6*n);const crk=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5);if(crk<.018)ih-=.9;ih+=Math.max(0,.04-Math.abs(fbm(x*.011-2,z*.011+6,2)-.5))*30;h=Math.max(h,ih);}}}
  {const A=SCN.atoll;const dx=x-A.x,dz=z-A.z;if(Math.abs(dx)<A.R*1.6&&Math.abs(dz)<A.R*1.6){const d=Math.hypot(dx,dz);if(d<A.R*1.55){const a=Math.atan2(dz,dx);const w=scnAtollW(a,x,z);const off=Math.abs(d-A.Rr);let base;if(d<A.Rr)base=-1.6-2.2*smooth(A.Rr*.2,A.Rr*.85,A.Rr-d)-.6*fbm(x*.03,z*.03,2);else base=lerp(-2.6,-24,smooth(A.R*1.05,A.R*1.5,d));
   h=Math.max(h,base);if(off<w){const land=1-smooth(w*.55,w,off);const dune=2.2+2.6*fbm(x*.03+1,z*.03-2,3)*land;h=Math.max(h,lerp(base,dune,smooth(0,.35,land)));}}}}
- {const R=SCN.riv;if(R){const q=scnRivQ(x,z);if(q&&q.d<40){const w=12;const t=q.d<w?q.w-1.8*(1-(q.d/w)*(q.d/w)):q.w-.15+(q.d-w)*.42;h=Math.min(h,t);}}}
+ {const G=SCN.glacier;if(G){const ex=x-G.x,ez=z-G.z;if(Math.abs(ex)<G.R*1.5&&Math.abs(ez)<G.R*1.5){const u=ex*G.dx+ez*G.dz,v=-ex*G.dz+ez*G.dx;const d=Math.hypot(u*.8,v)/G.R;if(d<1.1){const n=fbm(x*.03,z*.03,2);const dome=(1-smooth(.25,1.05,d))*(24+6*n)*(1-.35*smooth(-.2,1,u/G.R));h+=dome;}}}}
+ {const R=SCN.riv;if(R){const q=scnRivQ(x,z);if(q&&q.d<40){const w=R.old?12:lerp(7,12,smooth(0,R.L1+80,q.u));const t=q.d<w?q.w-1.8*(1-(q.d/w)*(q.d/w)):q.w-.15+(q.d-w)*.42;h=Math.min(h,t);}}}
  return h;}
 // colours painted over the terrain for the new places: [r,g,b,mask]
 function lin(r,g,b,m){return[Math.pow(r,2.2),Math.pow(g,2.2),Math.pow(b,2.2),m];}
@@ -995,6 +1015,7 @@ function scnMossZ(){if(SCN.mossZ)return SCN.mossZ;const Z=typeof DEEPWOODS!=='un
 function scnCol(x,z,h,slope){if(!SCN||!SCN.on)return null;
  {const Z=scnMossZ();if(Z&&Math.abs(x-Z.x)<Z.r*1.1&&Math.abs(z-Z.z)<Z.r*1.1&&h>1.5){const d=Math.hypot(x-Z.x,z-Z.z);if(d<Z.r*1.1){const m=1-smooth(Z.r*.8,Z.r*1.1,d);const n=fbm(x*.035+7,z*.035-3,3),v=vnoise(x*.2,z*.2);
   if(slope>.3)return lin(lerp(.2,.27,n),lerp(.27,.34,n),lerp(.15,.18,n),m);let c=[lerp(.1,.17,n),lerp(.2,.31,n),lerp(.06,.09,n)];if(v>.82)c=[.2,.36,.1];return lin(c[0],c[1],c[2],m);}}}
+ {const G=SCN.glacier;if(G){const ex=x-G.x,ez=z-G.z;const u=ex*G.dx+ez*G.dz,v=-ex*G.dz+ez*G.dx;const d=Math.hypot(u*.8,v)/G.R;if(d<1.12){const n=vnoise(x*.06,z*.06),c=Math.abs(fbm(x*.02+3,z*.02,2)-.5)<.03;return c?lin(.62,.8,.9,1-smooth(.95,1.12,d)):lin(lerp(.86,.95,n),lerp(.93,.97,n),lerp(.97,1,n),1-smooth(.95,1.12,d));}}}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&h>2.2&&h<34){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z)+10){const n=vnoise(x*.05,z*.05),c=Math.abs(fbm(x*.008+3,z*.008-8,3)-.5)<.022;return c?[.46,.66,.78,1]:[lerp(.86,.95,n),lerp(.92,.97,n),lerp(.96,1,n),1];}}}
  {const A=SCN.atoll;const d=Math.hypot(x-A.x,z-A.z);if(d<A.R*1.2&&h>-.2){const t=smooth(1.4,3.6,h);return[lerp(.93,.3,t),lerp(.87,.55,t),lerp(.72,.22,t),1];}}
  {const K0=SCN.karst;const dc=Math.hypot(x-K0.x,z-K0.z);if(dc<K0.R&&h>1.2){const rk=smooth(.18,.42,slope);return[lerp(.2,.32,rk),lerp(.42,.33,rk),lerp(.14,.3,rk),1];}}
@@ -1002,7 +1023,8 @@ function scnCol(x,z,h,slope){if(!SCN||!SCN.on)return null;
  {const Hh=SCN.high;const d=Math.hypot(x-Hh.x,z-Hh.z);if(d<Hh.R){if(slope>.26){const b=Math.sin(h*.5+fbm(x*.01,z*.01,2)*2.5)*.5+.5,mo=fbm(x*.04,z*.04,2);let c=[lerp(.24,.36,b),lerp(.23,.31,b),lerp(.21,.27,b)];if(mo>.58)c=[c[0]*.8,c[1]*1.15,c[2]*.75];return[c[0],c[1],c[2],1];}if(h>30){const v=fbm(x*.02+5,z*.02,3),hv=fbm(x*.05,z*.05,2);let c=[lerp(.3,.42,v),lerp(.38,.46,v),lerp(.16,.2,v)];if(hv>.62)c=[.42,.3,.4];return[c[0],c[1],c[2],(1-smooth(Hh.R*.8,Hh.R,d))*smooth(30,40,h)];}}}
  {const A=SCN.alps;if(Math.abs(x-A.x)<A.R*1.25&&Math.abs(z-A.z)<A.R*1.25&&h>1){const d=Math.hypot(x-A.x,z-A.z);if(d<A.R*1.2){const fade=1-smooth(A.R*.95,A.R*1.2,d);const mo=fbm(x*.03+4,z*.03-2,3),n=fbm(x*.02,z*.02,2);
   for(const L0 of A.lakes){if(Math.hypot(x-L0.x,z-L0.z)>L0.r*1.6)continue;const dn=scnLakeD(L0,x,z);if(dn<1.18&&h<L0.y+2.5)return lin(lerp(.46,.56,mo),lerp(.44,.52,mo),lerp(.4,.46,mo),fade);}
-  const snowL=172+30*n;
+  const snowL=172+30*n;const P0=A.peak;const pk=P0&&Math.hypot(x-P0.x,z-P0.z)<P0.R;
+  if(pk&&h>235+12*n&&slope<.9)return lin(lerp(.92,.98,mo),lerp(.94,.99,mo),lerp(.96,1,mo),fade);
   if(h>snowL&&slope<.5){const gl=slope<.26&&h>snowL+10;return gl?lin(.84,.92,.97,fade):lin(lerp(.9,.97,mo),lerp(.92,.98,mo),lerp(.95,1,mo),fade);}
   if(slope>.4){let c=[lerp(.36,.5,mo),lerp(.37,.5,mo),lerp(.38,.5,mo)];if(n>.6)c=[c[0]*.86,c[1]*.85,c[2]*.84];if(h>snowL-25){const sn=(h>snowL?.5:.25)*(1-smooth(.5,.8,slope));c=[lerp(c[0],.95,sn),lerp(c[1],.96,sn),lerp(c[2],.98,sn)];}if(h<85&&mo>.58)c=[c[0]*.7,c[1]*.82,c[2]*.62];return lin(c[0],c[1],c[2],fade);}
   if(slope>.24){const c=h>100?[lerp(.45,.55,mo),lerp(.44,.53,mo),lerp(.42,.5,mo)]:[lerp(.16,.22,mo),lerp(.23,.29,mo),lerp(.13,.16,mo)];return lin(c[0],c[1],c[2],fade*smooth(.24,.32,slope));}
@@ -1016,9 +1038,10 @@ function scnName(x,z){if(!SCN||!SCN.on)return null;
  {const A=SCN.atoll;if(Math.hypot(x-A.x,z-A.z)<A.R*1.35){for(const t of TOWNS)if(t.nation==='atoll'&&Math.hypot(t.x-x,t.z-z)<t.r*1.2)return t.name;return 'Saltglass Atoll (unclaimed)';}}
  {const K0=SCN.karst;if(Math.hypot(x-K0.x,z-K0.z)<K0.R)return 'The Jade Teeth';}
  {const S=SCN.spires;if(Math.hypot(x-S.x,z-S.z)<S.R*1.05)return 'The Thousand Spires';}
+ {const G=SCN.glacier;if(G&&Math.hypot(x-G.x,z-G.z)<G.R*1.1)return 'The Hollowroar Glacier';}
  {const C=SCN.canyon;const ex=x-C.x,ez=z-C.z;const u=ex*C.dx+ez*C.dz,v=-ex*C.dz+ez*C.dx;if(Math.hypot(u,v)<C.Rb+60||(u>0&&u<C.L*.8&&Math.abs(v)<70))return 'Hollowroar Falls';}
  {const Hh=SCN.high;if(Math.hypot(x-Hh.x,z-Hh.z)<Hh.R*.9)return 'The Pinehallow Highlands';}
- {const A=SCN.alps;if(Math.hypot(x-A.x,z-A.z)<A.R){let gd=1e9,gi=0;A.gorges.forEach((G,i)=>{const q=scnPolyD(x,z,G);if(q<gd){gd=q;gi=i;}});if(gd<40)return['Grimwater Gorge','Mossgullet Gorge'][gi];for(const L0 of A.lakes)if(Math.hypot(x-L0.x,z-L0.z)<L0.r*1.4)return L0.name;return 'The Fangtooth Peaks';}}
+ {const A=SCN.alps;if(Math.hypot(x-A.x,z-A.z)<A.R){let gd=1e9,gi=0;A.gorges.forEach((G,i)=>{const q=scnPolyD(x,z,G);if(q<gd){gd=q;gi=i;}});if(gd<40)return['Grimwater Gorge','Mossgullet Gorge'][gi];for(const L0 of A.lakes)if(Math.hypot(x-L0.x,z-L0.z)<L0.r*1.4)return L0.name;if(A.peak&&Math.hypot(x-A.peak.x,z-A.peak.z)<A.peak.R*.6)return 'Mount Whitefang';return 'The Fangtooth Peaks';}}
  {const I=SCN.ice,b=I.bb;if(x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&heightAt(x,z)>2.4){const q=scnIceQ(x,z);if(q.d<scnIceW(q.t,x,z))return 'The Rimeshelf';}}
  {const V=SCN.crater;const d=Math.hypot(x-V.x,z-V.z);if(d<V.Rc*.85)return 'The Moonbowl';if(d<V.R)return 'Cinderbowl Isle';}
  for(const w of SCN.wl)if(Math.hypot(x-w.x,z-w.z)<w.r)return w.name;
@@ -1060,22 +1083,18 @@ function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND
   LANDMARKS.push({name:'the Jade Teeth',x:K0.x,z:K0.z,r:K0.R});}
  // ---- Hollowroar Falls in the Pinehallow Highlands
  {const C=SCN.canyon,Hh=SCN.high;const lipD=C.Rb+3;const lx=C.x-C.dx*lipD,lz=C.z-C.dz*lipD;const top=heightAt(lx-C.dx*10,lz-C.dz*10);const pb=heightAt(C.x,C.z);const py=pb+2.4;
-  const wm=new THREE.MeshStandardMaterial({color:0x2f7f96,roughness:.06,metalness:.15,transparent:true,opacity:.86});
-  {const g=new THREE.CircleGeometry(C.Rb*1.02,40).rotateX(-PI/2);const m=new THREE.Mesh(g,wm);m.position.set(C.x,py,C.z);scene.add(m);}
-  waterfall(lx,top+.3,lz,lx+C.dx*8,py,lz+C.dz*8,24,'Hollowroar Falls');waterfall(lx-C.dz*15,top+.2,lz+C.dx*15,lx-C.dz*13+C.dx*7,py,lz+C.dx*13+C.dz*7,8,null);waterfall(lx+C.dz*13,top+.2,lz-C.dx*13,lx+C.dz*11+C.dx*6,py,lz-C.dx*11+C.dz*6,6,null);
-  const ribbon=(pts,w0,w1,yo)=>{const pos=[],idx=[];pts.forEach((q,i)=>{const nx=i<pts.length-1?pts[i+1].x-q.x:q.x-pts[i-1].x,nz=i<pts.length-1?pts[i+1].z-q.z:q.z-pts[i-1].z,l=Math.hypot(nx,nz)||1;const w=lerp(w0,w1,i/(pts.length-1));const y=Math.max(q.y!==undefined?q.y:heightAt(q.x,q.z)+yo,.15);pos.push(q.x-nz/l*w,y,q.z+nx/l*w,q.x+nz/l*w,y,q.z-nx/l*w);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,wm));};
-  // stream across the moor to the lip
-  {const st=[];for(let i=0;i<=24;i++){const u=i/24;const d=lipD+300*(1-u);st.push({x:C.x-C.dx*d+Math.sin(u*8)*14*(1-u)*C.dz,z:C.z-C.dz*d-Math.sin(u*8)*14*(1-u)*C.dx});}ribbon(st,4,7,.35);}
-  // the river: one continuous, flowing channel from the plunge pool all the way down into Hollow Lake, with a second fall where it leaves the gorge
-  {const R=SCN.riv;const pts=[];for(let k=0;k<R.W.length;k++){const u=k*5;pts.push({x:R.x+R.dx*u,z:R.z+R.dz*u,y:Math.min(R.W[k],py),u});}
-   let runs=[],cur=[];for(let k=0;k<pts.length;k++){if(pts[k].y<.2){cur.push(pts[k]);break;}cur.push(pts[k]);if(k<pts.length-1&&pts[k].y-pts[k+1].y>1.1){let e=k+1;while(e<pts.length-1&&pts[e].y-pts[e+1].y>1.1)e++;runs.push(cur);const lip=pts[k],base=pts[e];const by=Math.max(base.y,.1);
-     waterfall(lip.x,lip.y+.15,lip.z,base.x,by,base.z,17,runs.length===1?'Lower Hollowroar Falls':null);SCN.lowerFall={x:base.x,z:base.z,y:by};cur=[base];k=e;if(base.y<.2)break;}}
-   if(cur.length>1)runs.push(cur);
-   for(const run of runs){const pos=[],uv=[],idx=[];let L=0;run.forEach((q,i)=>{const w=lerp(7.5,10.5,q.u/R.len);if(i)L+=Math.hypot(q.x-run[i-1].x,q.z-run[i-1].z);pos.push(q.x-R.dz*w,q.y,q.z+R.dx*w,q.x+R.dz*w,q.y,q.z-R.dx*w);uv.push(0,L/11,1,L/11);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});
-    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,rvMat());m.renderOrder=2;scene.add(m);}
-   // white water where the bed steps down
-   const fb=new VB(),r5=mulberry(5353);for(let k=1;k<pts.length;k++){const dy=pts[k-1].y-pts[k].y;if(dy<.25||dy>1.1||pts[k].y<.3)continue;for(let n=0;n<4;n++)fb.add(GB.sphs,'#fff',TM(pts[k].x+(r5()-.5)*14*R.dz,pts[k].y+.05,pts[k].z-(r5()-.5)*14*R.dx,.8+r5()*1.2,.25,.8+r5()*1.2));}
-   if(fb.p.length)scene.add(new THREE.Mesh(fb.geometry(),new THREE.MeshBasicMaterial({color:0xeef8fb,transparent:true,opacity:.6})));}
+  {const R=SCN.riv;const pts=[];for(let k=0;k<R.W.length;k++){const u=k*5;const m=scnRivMo(R,u);pts.push({x:R.x+R.dx*u-R.dz*m,z:R.z+R.dz*u+R.dx*m,y:Math.max(R.W[k],.12),u});if(R.W[k]<.12)break;}
+   const pos=[],dep=[],idx=[];pts.forEach((q,i)=>{const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];let tx=b.x-a.x,tz=b.z-a.z;const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;const w=lerp(3.6,10.5,smooth(0,R.len,q.u));
+    pos.push(q.x+tz*w,q.y,q.z-tx*w, q.x,q.y,q.z, q.x-tz*w,q.y,q.z+tx*w);const dc=lerp(2.6,3.6,smooth(0,R.len,q.u));dep.push(.8,dc,.8);if(i){const o=3*i-3,n=3*i;idx.push(o,n,o+1,o+1,n,n+1,o+1,n+1,o+2,o+2,n+1,n+2);}});
+   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('dep',new THREE.Float32BufferAttribute(dep,1));g.setIndex(idx);const m=new THREE.Mesh(g,lvlWaterMat());m.renderOrder=1;m.frustumCulled=false;scene.add(m);
+   // white water wherever the stream steepens, and blue-white ice at the glacier
+   const fb=new VB(),r5=mulberry(5353);for(let k=1;k<pts.length;k++){const dy=pts[k-1].y-pts[k].y;if(dy<.55||pts[k].y<.3)continue;for(let n=0;n<3;n++){const o=(r5()-.5)*5;fb.add(GB.sphs,'#fff',TM(pts[k].x+o*R.dz,pts[k].y+.08,pts[k].z-o*R.dx,.7+r5()*1.1,.22,.7+r5()*1.1));}}
+   if(fb.p.length){const fm=new THREE.Mesh(fb.geometry(),new THREE.MeshBasicMaterial({color:0xeef8fb,transparent:true,opacity:.55}));fm.renderOrder=2;scene.add(fm);}
+   const G=SCN.glacier,ib=new VB(),r6=mulberry(6363);for(let k=0;k<70;k++){const a=r6()*TAU,d=Math.sqrt(r6())*G.R*.9;const x=G.x+Math.cos(a)*d,z=G.z+Math.sin(a)*d;const h=heightAt(x,z);const s0=1.5+r6()*4;ib.add(r6()<.5?GB.ico0:GB.dode,r6()<.5?'#e4f1f8':'#bfdcec',TM(x,h-s0*.3,z,s0*(1+r6()),s0*(.5+r6()*.9),s0*(1+r6()),r6(),r6()*3,r6()),'#9cc6de');}
+   {const sx=R.x,sz=R.z,sh=heightAt(sx-R.dx*6,sz-R.dz*6);ib.add(GB.hemi,'#2d5a73',TM(sx-R.dx*3,sh-2.2,sz-R.dz*3,5,4.5,3,0,Math.atan2(R.dx,R.dz),0));}
+   const im=new THREE.Mesh(ib.geometry(),archMat);im.castShadow=true;im.receiveShadow=true;scene.add(im);
+   scnClearVeg((x,z)=>{const q=scnRivQ(x,z);if(q&&q.d<13)return true;const ex=x-G.x,ez=z-G.z;return Math.hypot((ex*G.dx+ez*G.dz)*.8,-ex*G.dz+ez*G.dx)<G.R;});
+   LANDMARKS.push({name:'the Hollowroar Glacier',x:G.x,z:G.z,r:G.R});LANDMARKS.push({name:'Hollowroar Falls',x:lx,z:lz,r:40});}
   const r2=mulberry(5151);for(let t=0;t<1600;t++){const a=r2()*TAU,d=Math.sqrt(r2())*Hh.R*.95;const x=Hh.x+Math.cos(a)*d,z=Hh.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<6)continue;const sl=Math.abs(heightAt(x+2,z)-h)+Math.abs(heightAt(x,z+2)-h);if(sl>3.2){if(r2()<.12)scnVeg('rock',x,h-.3,z,1+r2()*2);continue;}if(onWay(x,z,4))continue;const q=r2();const grove=fbm(x*.01+2,z*.01,3)>.5;if(grove&&q<.7)scnVeg('pine',x,h-.25,z,.7+r2()*.7);else if(q<.12)scnVeg('rmoss',x,h-.3,z,.8+r2()*1.6);else if(q<.3)scnVeg('fern',x,h-.25,z,.8+r2()*.5);}
   for(let t=0;t<500;t++){const a=r2()*TAU,d=C.Rb+4+r2()*90;const x=C.x+Math.cos(a)*d,z=C.z+Math.sin(a)*d;const h=heightAt(x,z);if(h<pb+20)continue;scnVeg('pine',x,h-.25,z,.8+r2()*.6);}
   LANDMARKS.push({name:'the Pinehallow Highlands',x:Hh.x,z:Hh.z,r:Hh.R});SCN.mist={x:lx+C.dx*10,z:lz+C.dz*10};}
@@ -1091,13 +1110,13 @@ function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND
    const hs=pts.map(q=>heightAt(q.x,q.z));if(hs[0]<hs[hs.length-1]){pts.reverse();hs.reverse();}let prev=1e9;const pos=[],idx=[];pts.forEach((q,i)=>{const nx=i<pts.length-1?pts[i+1].x-q.x:q.x-pts[i-1].x,nz=i<pts.length-1?pts[i+1].z-q.z:q.z-pts[i-1].z,l=Math.hypot(nx,nz)||1;let y=Math.min(prev,hs[i]+.35);if(y<.2)y=.2;prev=y;const w=4+3*Math.sin(i*.7);pos.push(q.x-nz/l*w,y,q.z+nx/l*w,q.x+nz/l*w,y,q.z-nx/l*w);if(i)idx.push(2*i-2,2*i-1,2*i,2*i-1,2*i+1,2*i);});
    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();scene.add(new THREE.Mesh(g,wm));}
   // glacial lakes: milky turquoise, shaped like their shores
-  const lm=new THREE.MeshLambertMaterial({color:0x22aebf,emissive:0x07343c,transparent:true,opacity:.95});
-  for(const L0 of A.lakes){const pos=[L0.x,L0.y,L0.z],idx=[];const NS=48;for(let k=0;k<=NS;k++){const a=k/NS*TAU;const rr0=L0.r*(1+.13*Math.sin(a*3+L0.ph)+.07*Math.sin(a*5-L0.ph))*1.12;pos.push(L0.x+Math.cos(a)*rr0,L0.y,L0.z+Math.sin(a)*rr0);if(k)idx.push(0,k+1,k);}
-   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,lm);m.receiveShadow=true;scene.add(m);
+  for(const L0 of A.lakes){const pos=[L0.x,L0.y,L0.z],dep=[6],idx=[];const NS=64,NR=4;for(let ri=1;ri<=NR;ri++){const f=ri/NR;for(let k=0;k<NS;k++){const a=k/NS*TAU;const rr0=L0.r*(1+.13*Math.sin(a*3+L0.ph)+.07*Math.sin(a*5-L0.ph))*1.12*f;pos.push(L0.x+Math.cos(a)*rr0,L0.y,L0.z+Math.sin(a)*rr0);dep.push(Math.max(0,6*(1-Math.pow(f/.9,2))));}}
+   for(let k=0;k<NS;k++)idx.push(0,1+(k+1)%NS,1+k);for(let ri=1;ri<NR;ri++){const a0=1+(ri-1)*NS,b0=1+ri*NS;for(let k=0;k<NS;k++){const k1=(k+1)%NS;idx.push(a0+k,a0+k1,b0+k,a0+k1,b0+k1,b0+k);}}
+   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('dep',new THREE.Float32BufferAttribute(dep,1));g.setIndex(idx);const m=new THREE.Mesh(g,lvlWaterMat());m.renderOrder=1;scene.add(m);
    const rb=new VB(),r6=mulberry(Math.round(L0.x*3+L0.z));for(let k=0;k<26;k++){const a=r6()*TAU,rr0=L0.r*(1+.13*Math.sin(a*3+L0.ph)+.07*Math.sin(a*5-L0.ph))*(.98+r6()*.12);const x=L0.x+Math.cos(a)*rr0,z=L0.z+Math.sin(a)*rr0;const s0=.8+r6()*2.2;rb.add(r6()<.5?GB.dode:GB.ico0,r6()<.5?'#8d8a82':'#a39f95',TM(x,L0.y-.4,z,s0*1.3,s0*.7,s0,r6(),r6()*3,r6()),'#6f6c66');}
    const rm=new THREE.Mesh(rb.geometry(),archMat);rm.castShadow=true;rm.receiveShadow=true;scene.add(rm);
    LANDMARKS.push({name:L0.name,x:L0.x,z:L0.z,r:L0.r*1.3});}
-  LANDMARKS.push({name:'the Fangtooth Peaks',x:A.x,z:A.z,r:A.R});}
+  LANDMARKS.push({name:'the Fangtooth Peaks',x:A.x,z:A.z,r:A.R});if(A.peak)LANDMARKS.push({name:'Mount Whitefang',x:A.peak.x,z:A.peak.z,r:90});}
  // ---- the Rimeshelf: no trees on the ice, a few pressure-ridge blocks
  {const I0=SCN.ice,b=I0.bb;const onIce=(x,z)=>x>b[0]&&x<b[1]&&z>b[2]&&z<b[3]&&heightAt(x,z)>2.5&&heightAt(x,z)<14&&scnIceQ(x,z).d<scnIceW(scnIceQ(x,z).t,x,z);scnClearVeg(onIce);
   const vb=new VB(),r2=mulberry(6161);for(let t=0;t<1600;t++){const x=b[0]+r2()*(b[1]-b[0]),z=b[2]+r2()*(b[3]-b[2]);if(!onIce(x,z))continue;const h=heightAt(x,z);const s=1+r2()*3.5;vb.add(r2()<.5?GB.ico0:GB.dode,r2()<.5?'#e6f1f7':'#cfe3ef',TM(x,h-.3*s,z,s*(1+r2()),s*(.5+r2()*.8),s*(1+r2()),r2(),r2()*3,r2()),'#a9cfe2');}
@@ -1112,6 +1131,7 @@ function buildScenery(){if(!SCN||!SCN.on)return;const P=[],Cc=[],I=[];const SAND
  try{scnCoral();}catch(e){console.error(e);}
  try{scnOakInn();}catch(e){console.error(e);}
  try{scnOakPads();}catch(e){console.error(e);}
+ {const G=SCN.glacier;if(G)scnClearVeg((x,z)=>{const ex=x-G.x,ez=z-G.z;return Math.hypot((ex*G.dx+ez*G.dz)*.8,-ex*G.dz+ez*G.dx)<G.R*1.08;});}
  try{scnCraterBuild();}catch(e){console.error(e);}
  try{scnWonders();}catch(e){console.error(e);}
  // ---- Dunwhisker Castle on the southern Pinehallow sea cliffs
@@ -1167,6 +1187,9 @@ function scnCoral(){const V=new VB(),r=mulberry(9191);const COL=['#ff7f6b','#ff9
  for(let i=0;i<3000;i++){const K0=SCN.karst;const a=r()*TAU,d=Math.sqrt(r())*K0.R;tryPatch(K0.x+Math.cos(a)*d,K0.z+Math.sin(a)*d);}
  for(let i=0;i<90000&&patches<1500;i++){const x=(r()-.5)*2*HALF*.9,z=(r()-.5)*2*HALF*.9;tryPatch(x,z);}
  if(!V.p.length)return;const m=new THREE.Mesh(V.geometry(),new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,emissive:0x111111}));m.receiveShadow=true;scene.add(m);SCN.coral=patches;}
+// ---- water above sea level that looks exactly like the ocean: same shader and uniforms, depth from a vertex attribute
+let _lwm=null;function lvlWaterMat(){if(_lwm)return _lwm;const om=water.material;let fs=om.fragmentShader.replace('varying vec3 vW;','varying vec3 vW;varying float vDep;').replace(/vec2 huv=[\s\S]*?float depth=max\(-hh,0\.\);/,'float depth=vDep;');
+ _lwm=new THREE.ShaderMaterial({uniforms:om.uniforms,transparent:true,side:THREE.DoubleSide,vertexShader:`attribute float dep;varying vec3 vW;varying float vDep;void main(){vDep=dep;vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,fragmentShader:fs});return _lwm;}
 // ---- flowing river surface (shares the waterfall clock)
 let _rvm=null;function rvMat(){if(_rvm)return _rvm;_rvm=new THREE.ShaderMaterial({uniforms:Object.assign(THREE.UniformsUtils.clone(THREE.UniformsLib.fog),{uT:WFU.uT}),transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
  vertexShader:`varying vec2 vU;
@@ -1971,9 +1994,9 @@ function shipHullGeo(ki){const key='hull'+ki;if(SHIPC[key])return SHIPC[key];con
  for(let i=0;i<=NZ;i++){const t=i/NZ,z=lerp(Z0,Z1,t);const w=1.95*Math.max(.02,1-Math.pow(Math.abs(t-.42)/(t>.42?.58:.42),t>.42?2.2:3)*(t>.42?1:.55));const top=1.15+.75*Math.pow(2*t-1,2)+(t<.12?.6*(1-t/.12):0);const kd=-1.9+.5*Math.pow(2*t-1,4);
   for(let j=0;j<=NS;j++){const s=j/NS;const y=lerp(kd,top,s);const sx=s<.72?Math.pow(Math.sin(s/.72*PI/2),.65):1-(s-.72)*.32;for(const sd of[-1,1]){}pos.push(w*sx,y,z);C.set(band(y));const plank=(Math.floor((y+3)*4.2)%2)?.94:1;col.push(C.r*plank,C.g*plank,C.b*plank);}}
  const row=NS+1;const P=pos.length/3;for(let i=0;i<P;i++){pos.push(-pos[i*3],pos[i*3+1],pos[i*3+2]);col.push(col[i*3],col[i*3+1],col[i*3+2]);}
- for(let i=0;i<NZ;i++)for(let j=0;j<NS;j++){const a=i*row+j,b=a+row,c=a+1,d=b+1;idx.push(a,b,c,c,b,d);const a2=a+P,b2=b+P,c2=c+P,d2=d+P;idx.push(a2,c2,b2,c2,d2,b2);}
+ for(let i=0;i<NZ;i++)for(let j=0;j<NS;j++){const a=i*row+j,b=a+row,c=a+1,d=b+1;idx.push(a,c,b,c,d,b);const a2=a+P,b2=b+P,c2=c+P,d2=d+P;idx.push(a2,b2,c2,c2,b2,d2);}
  // transom at the stern
- const st=pos.length/3;pos.push(0,lerp(-1.4,2.4,.5),Z0);col.push(.18,.13,.09);for(let j=0;j<=NS;j++){idx.push(st,j,j+P);}
+ const st=pos.length/3;pos.push(0,lerp(-1.4,2.4,.5),Z0);col.push(.18,.13,.09);for(let j=0;j<NS;j++){idx.push(st,j,j+1,st,j+1,j,st,j+P+1,j+P,st,j+P,j+P+1);}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();return SHIPC[key]=g;}
 function sailTex(){if(SHIPC.stex)return SHIPC.stex;const c=document.createElement('canvas');c.width=128;c.height=128;const x=c.getContext('2d');x.fillStyle='#efe6d0';x.fillRect(0,0,128,128);for(let i=0;i<8;i++){x.fillStyle=`rgba(120,100,70,${.06+(i%2)*.04})`;x.fillRect(i*16,0,1.5,128);}for(let i=0;i<128;i+=2){x.fillStyle=`rgba(255,255,255,${Math.random()*.05})`;x.fillRect(0,i,128,1);}x.fillStyle='rgba(90,70,50,.18)';x.fillRect(0,0,128,3);x.fillRect(0,125,128,3);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return SHIPC.stex=t;}
 function makeShip(ki){const g=new THREE.Group();const hull=new THREE.Mesh(shipHullGeo(ki),archMat);hull.castShadow=true;hull.receiveShadow=true;g.add(hull);const b=new VB(),wb=new VB();const wood='#9a7650',dark='#3a2a1a',gold='#d9b24a';

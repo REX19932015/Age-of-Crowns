@@ -56,9 +56,9 @@ const RANKS = W.ranks;
 // Ranks up to Warrant Officer are earned in the field; every rank above it is granted by an admin.
 const WARRANT = RANKS.indexOf('Warrant Officer'), MAX_RANK = RANKS.length - 1;
 // Specialised corps. Only admins assign them, except that a line Warrant Officer may volunteer for the Storm Troopers.
-const CORPS = { line: 'Line Infantry', sniper: 'Snipers', storm: 'Storm Troopers', heavy: 'Heavy Infantry', raider: 'Trench Raiders', gas: 'Gas Sentinels', flamer: 'Flame Pioneers', ranger: 'Frost Rangers', aviator: 'Sky Corps', cuirassier: 'Royal Cuirassiers' };
-const CORPS_HAT = { line: 'stahlhelm', sniper: 'ghillie', storm: 'stahlhelm', heavy: 'heavyhelm', raider: 'raiderhelm', gas: 'gashelm', flamer: 'flamehelm', ranger: 'snowhood', aviator: 'flycap', cuirassier: 'cuirhelm' };
-const CORPS_HAT_OLD = ['ironmask', 'pickelhaube'];   // hats of corps that no longer exist
+const CORPS = { line: 'Line Infantry', sniper: 'Snipers', storm: 'Storm Troopers', heavy: 'Heavy Infantry' };
+const CORPS_HAT = { line: 'stahlhelm', sniper: 'ghillie', storm: 'stahlhelm', heavy: 'heavyhelm' };
+const CORPS_HAT_OLD = ['ironmask', 'pickelhaube', 'raiderhelm', 'gashelm', 'flamehelm', 'snowhood', 'flycap', 'cuirhelm'];   // hats of corps that no longer exist
 const CORPS_HATS = new Set(Object.values(CORPS_HAT).concat(CORPS_HAT_OLD));
 const corpsOf = S => (S.mil && CORPS[S.mil.corps]) ? S.mil.corps : null;
 // a look may only show corps gear the server has actually granted

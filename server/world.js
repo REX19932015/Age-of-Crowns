@@ -26,12 +26,12 @@ module.exports = function makeWorld(ctx) {
   const CAPS = { foot: 100, guns: 200, horse: 500 };
   const UNITCOST = { foot: 4, horse: 7, guns: 9 };
   const TBASE = { capital: 120, city: 70, town: 45, village: 22, market: 0 };
-  const DIVS = { foot: { line: [1, 1, 1], storm: [1.3, .85, 1.2], heavy: [1.1, 1.3, .85], sniper: [1.25, .8, .95], raider: [1.2, .9, 1.3], gas: [1.1, 1.15, 1], flamer: [1.45, 1.05, .95], ranger: [1.05, .9, 1.3], aviator: [.95, .85, 1.45] },
-    // the infantry divisions are the corps; companies saved under the old names are renamed when the world loads
+  const DIVS = { foot: { line: [1, 1, 1], storm: [1.3, .85, 1.2], heavy: [1.1, 1.3, .85], sniper: [1.25, .8, .95], light: [1.05, .9, 1.3], grenadier: [1.1, 1.25, .9], guard: [1.15, 1.15, 1] },
+    // infantry: the player corps (Line, Shock Troopers, Heavy, Snipers) and the old legions; retired names are renamed when the world loads
     horse: { hussar: [1, .9, 1.3], dragoon: [1.05, 1, 1.1], cuirassier: [1.35, 1.25, .9] }, guns: { field: [1, 1, 1], horse: [.85, .9, 1.6], siege: [1.2, .9, .7] } };
   const DIV0 = { foot: 'line', horse: 'dragoon', guns: 'field' };
-  const DIVMAP = { shock: 'storm', grenadier: 'heavy', light: 'ranger', guard: 'gas' };
-  const FOOTMIX = ['line', 'line', 'line', 'storm', 'heavy', 'sniper', 'raider', 'gas', 'flamer', 'ranger', 'aviator'];   // what the AI raises
+  const DIVMAP = { shock: 'storm', raider: 'light', gas: 'guard', flamer: 'storm', ranger: 'light', aviator: 'light' };
+  const FOOTMIX = ['line', 'line', 'line', 'storm', 'heavy', 'sniper', 'light', 'grenadier', 'guard'];   // what the AI raises
   const FORMS = ['line', 'column', 'square', 'skirmish'], STANCES = ['attack', 'defend', 'hold'];
   const PERS = { warlike: { agg: .85, dip: .3, greed: .5, caut: .25 }, diplomatic: { agg: .2, dip: .9, greed: .35, caut: .6 }, mercantile: { agg: .35, dip: .6, greed: .85, caut: .5 }, cautious: { agg: .2, dip: .5, greed: .4, caut: .9 }, scheming: { agg: .55, dip: .45, greed: .6, caut: .45 } };
   const POL = { conscript: { appr: -6, mil: 1.2 }, freetrade: { inc: -.15, rel: 1 }, tolls: { inc: .2, appr: -3, rel: -1 }, subsidy: { appr: 10, cost: 80 }, martial: { appr: -10, stab: 4 }, bounty: { cost: 60 }, press: { appr: 4, stab: -1 }, guilds: { cost: 50 }, borders: { stab: 3, rel: -2 }, tithe: { cost: 40, appr: 2 }, schools: { cost: 70, stab: 2, appr: 3 }, levy: { inc: .12, appr: -5 } };
@@ -160,7 +160,7 @@ module.exports = function makeWorld(ctx) {
     }
   }
   const shaken = R => R.lastRout !== undefined && W.t - R.lastRout < .25 && R.str < FIELD[R.type].size * .6; // regrouping after a rout: out of the fight
-  function casualty(R, n) { R.str = Math.max(0, R.str - n); R.mor = Math.max(0, R.mor - n * 3.2 / (R.div === 'gas' ? 1.7 : 1)); dirty = true; }
+  function casualty(R, n) { R.str = Math.max(0, R.str - n); R.mor = Math.max(0, R.mor - n * 3.2 / (R.div === 'guard' ? 1.7 : 1)); dirty = true; }
   function rout(R, Wn) {
     if (R.rout) return; R.rout = true; R.lastRout = W.t; R.routT = 45; R.busy = false; retreat(R); if (R.str > 0) news(`The ${R.name} break and flee${Wn ? ` from the ${Wn.name}` : ''}! ${R.str} of them get away.`, 'bad');
     if (Wn) { Wn.cmd.wins++; Wn.cmd.fame += 4; R.cmd.losses++; W.ws[Wn.k][R.k] += 4; Wn.mor = Math.min(100, Wn.mor + 8); W.ai[R.k].stab = Math.max(5, W.ai[R.k].stab - 2); setRel(Wn.k, R.k, W.rel[Wn.k][R.k] - 3);

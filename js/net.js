@@ -163,6 +163,11 @@
 
   // ------------------------------------------------------------------ messages from the server
   const RX = {
+    // the shared realm: politics, news and armies run on the server (server/world.js)
+    wstate(m) { if (window.AOC_WORLD) window.AOC_WORLD.state(m.w); },
+    wregs(m) { if (window.AOC_WORLD) window.AOC_WORLD.regs(m); },
+    wnews(m) { if (window.AOC_WORLD) window.AOC_WORLD.news(m.items); },
+    wwin(m) { if (window.AOC_WORLD) window.AOC_WORLD.win(m); },
     auth(m) {
       if (!m.ok) { N.noRetry = true; N.sb.auth.signOut().catch(() => {}); if (!N.entered) showSignIn(m.msg); else toast(m.msg, 'bad'); return; }
       HOOK.online = true; N.you = Object.assign(N.you || {}, { id: m.id, admin: m.admin });

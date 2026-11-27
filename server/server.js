@@ -509,19 +509,19 @@ async function onChat(S, m) {
   const base = { t: 'chat', from: S.char.name, fnid: S.nid, k: S.char.kingdom, title: titleOf(S), body, ts: now() };
   if (ch === 'global') {
     const msg = { ...base, ch: 'global' }; pushHistory('global', msg); each(O => send(O, msg));
-    q(db.insert('chat_messages', { channel: 'global', sender: S.id, sender_name: S.char.name, body }, { returning: false }));
+    if (!S.bot) q(db.insert('chat_messages', { channel: 'global', sender: S.id, sender_name: S.char.name, body }, { returning: false }));
   } else if (ch === 'local') {
     const msg = { ...base, ch: 'local' };
     each(O => { if (O.inside === S.inside && fin(O.x) && Math.hypot(O.x - S.x, O.z - S.z) <= CFG.LOCAL_CHAT) send(O, msg); });
   } else if (ch === 'kingdom') {
     const k = S.char.kingdom, msg = { ...base, ch: 'kingdom' };
     pushHistory('kingdom:' + k, msg); each(O => { if (O.char.kingdom === k) send(O, msg); });
-    q(db.insert('chat_messages', { channel: 'kingdom:' + k, sender: S.id, sender_name: S.char.name, body }, { returning: false }));
+    if (!S.bot) q(db.insert('chat_messages', { channel: 'kingdom:' + k, sender: S.id, sender_name: S.char.name, body }, { returning: false }));
   } else if (ch === 'army') {
     if (!S.mil) return err(S, 'Only soldiers can use army chat. Enlist with a recruiter first.');
     const a = S.mil.army, msg = { ...base, ch: 'army', rank: RANKS[S.mil.rank] };
     pushHistory('army:' + a, msg); each(O => { if (O.mil && O.mil.army === a) send(O, msg); });
-    q(db.insert('chat_messages', { channel: 'army:' + a, sender: S.id, sender_name: S.char.name, body }, { returning: false }));
+    if (!S.bot) q(db.insert('chat_messages', { channel: 'army:' + a, sender: S.id, sender_name: S.char.name, body }, { returning: false }));
   } else if (ch === 'squad') {
     const sq = WORLD && WORLD.squadOf(S.id);
     if (!sq) return err(S, 'You are not in a squad. Your officers can add you to one from the Army tab.');
@@ -542,7 +542,7 @@ async function privateMessage(S, toName, body) {
   }
   if (tid === S.id) return err(S, 'You mutter to yourself.');
   const msg = { t: 'chat', ch: 'pm', from: S.char.name, fnid: S.nid, to: tname, body, ts: now() };
-  await q(db.insert('private_messages', { sender: S.id, sender_name: S.char.name, recipient: tid, body, delivered: !!target }, { returning: false }));
+  if (!S.bot && !(target && target.bot)) await q(db.insert('private_messages', { sender: S.id, sender_name: S.char.name, recipient: tid, body, delivered: !!target }, { returning: false }));
   if (target) send(target, msg);
   send(S, { ...msg, echo: true, offline: !target });
 }

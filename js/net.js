@@ -12,7 +12,7 @@
   if (!ONLINE) { console.info('[Age of Crowns] Online play is off. Fill in js/config.js to turn it on.'); return; }
 
   const KCOL = ['#9fcbff', '#ff9d8c', '#97e3a3', '#86e1ee'];
-  const CH_NAMES = { global: 'Global', local: 'Local', kingdom: 'Kingdom', army: 'Army', pm: 'Private', sys: 'Herald' };
+  const CH_NAMES = { global: 'Global', local: 'Local', kingdom: 'Kingdom', army: 'Army', squad: 'Squad', pm: 'Private', sys: 'Herald' };
   const N = {
     sb: null, ws: null, session: null, you: null, ready: false, entered: false, creating: false, needCharacter: false,
     wseq: 0, remotes: new Map(), roster: [], props: new Map(), pol: null, mil: null, events: new Map(), offices: [], regiments: [],
@@ -55,7 +55,6 @@
       return true;
     },
     outfit(o) { N.look = cleanLook(o); if (N.ready) send({ t: 'look', look: N.look }); },
-    joinStorm() { send({ t: 'joinStorm' }); },
     mapMarkers(ctx, tr, scale) {
       ctx.save();
       for (const e of N.events.values()) { const p = tr(e.x, e.z); ctx.fillStyle = '#ffd25a'; ctx.strokeStyle = '#3a2400'; ctx.lineWidth = 2 * scale; star(ctx, p[0], p[1], 9 * scale); ctx.fill(); ctx.stroke(); }
@@ -64,6 +63,7 @@
         if ((N.you && r.nid === N.you.nid) || r.x == null) continue;
         const p = tr(r.x, r.z); ctx.fillStyle = KCOL[r.k] || '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5 * scale;
         ctx.beginPath(); ctx.arc(p[0], p[1], 4.5 * scale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        if (N.sqNames && N.sqNames.has(r.name)) { ctx.strokeStyle = '#7fd3ff'; ctx.lineWidth = 2.5 * scale; ctx.beginPath(); ctx.arc(p[0], p[1], 8 * scale, 0, Math.PI * 2); ctx.stroke(); }
         ctx.lineWidth = 3 * scale; ctx.strokeText(r.name, p[0], p[1] - 8 * scale); ctx.fillStyle = '#fff'; ctx.fillText(r.name, p[0], p[1] - 8 * scale);
       }
       if (window.AOC_SEASONS) try { window.AOC_SEASONS.mapMarkers(ctx, tr, scale); } catch (e) {}
@@ -168,6 +168,18 @@
     wregs(m) { if (window.AOC_WORLD) window.AOC_WORLD.regs(m); },
     wnews(m) { if (window.AOC_WORLD) window.AOC_WORLD.news(m.items); },
     wwin(m) { if (window.AOC_WORLD) window.AOC_WORLD.win(m); },
+    wroster(m) {
+      N.wr = m; if (window.AOC_WORLD && window.AOC_WORLD.roster) window.AOC_WORLD.roster(m);
+      const sq = m.me && m.me.sq; const names = new Set(); if (sq) for (const list of Object.values(m.cos)) for (const e of list) if (e[3] === sq && (!N.you || e[0] !== N.you.name)) names.add(e[0]);
+      const was = [...(N.sqNames || [])].sort().join('|'); N.sqNames = names;
+      if (was !== [...names].sort().join('|')) for (const R of N.remotes.values()) if (R.lastP) { A().scene.remove(R.tag); try { R.tag.material.map.dispose(); } catch (e) {} R.tag = nameTag(R.lastP); A().scene.add(R.tag); }
+      if (N.realmOpen && N.realmTab === 'army' && !milTyping()) renderRealm();
+    },
+    wsqinv(m) {
+      A().openPanel('Squad orders', m.co, `<p>${esc(m.from)} assigns you to squad <b>${esc(m.name)}</b> of the ${esc(m.co)}.</p><p class="aocsmall">Joining also puts you in that company. Squad chat and markers then link you with your squadmates.</p>`, [
+        { label: 'Fall in', primary: true, fn: () => { send({ t: 'wcmd', op: 'sqAcc', sq: m.sq, ok: true }); A().closePanel(); } },
+        { label: 'Decline', fn: () => { send({ t: 'wcmd', op: 'sqAcc', sq: m.sq, ok: false }); A().closePanel(); } }]);
+    },
     auth(m) {
       if (!m.ok) { N.noRetry = true; N.sb.auth.signOut().catch(() => {}); if (!N.entered) showSignIn(m.msg); else toast(m.msg, 'bad'); return; }
       HOOK.online = true; N.you = Object.assign(N.you || {}, { id: m.id, admin: m.admin });
@@ -185,7 +197,11 @@
     wallet(m) { if (!N.entered) { N.wal = m; if (typeof m.wseq === 'number') N.wseq = m.wseq; return; } applyWallet(m); },
     pj(m) { addRemote(m.p); }, pu(m) { addRemote(m.p, true); }, pl(m) { removeRemote(m.nid); },
     st(m) { for (const a of m.p) { const R = N.remotes.get(a[0]); if (!R) continue; R.tx = a[1]; R.ty = a[2]; R.tz = a[3]; R.tyaw = a[4]; setMode(R, a[5]); R.spd = a[6]; } },
-    roster(m) { N.roster = m.list; if (N.realmOpen && N.realmTab === 'players') renderRealm(); },
+    roster(m) {
+      const key = l => l.filter(r => r.army >= 0).map(r => r.nid + ':' + r.rank + ':' + r.corps + ':' + r.army).join(',');
+      const armyChanged = key(N.roster || []) !== key(m.list); N.roster = m.list;
+      if (N.realmOpen && (N.realmTab === 'players' || (N.realmTab === 'army' && armyChanged && !milTyping()))) renderRealm();
+    },
     chat(m) { addChat(m); },
     toast(m) { toast(m.msg, m.cls); },
     err(m) { if (!N.entered) authMsg(m.msg, true); else toast(m.msg, 'bad'); if (N.creating && !N.entered) N.creating = false; },
@@ -276,7 +292,8 @@
   function nameTag(p) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
     g.textAlign = 'center'; g.lineJoin = 'round';
-    g.font = '700 46px Cinzel, Georgia, serif'; g.lineWidth = 9; g.strokeStyle = 'rgba(10,14,22,.85)'; g.strokeText(p.name, 256, 54); g.fillStyle = (p.cos && p.cos.plate) || KCOL[p.k] || '#fff'; g.fillText(p.name, 256, 54);
+    const mate = N.sqNames && N.sqNames.has(p.name); const nm = mate ? '◆ ' + p.name : p.name;
+    g.font = '700 46px Cinzel, Georgia, serif'; g.lineWidth = 9; g.strokeStyle = 'rgba(10,14,22,.85)'; g.strokeText(nm, 256, 54); g.fillStyle = mate ? '#7fd3ff' : ((p.cos && p.cos.plate) || KCOL[p.k] || '#fff'); g.fillText(nm, 256, 54);
     g.font = 'italic 30px Alegreya, Georgia, serif'; g.lineWidth = 7; g.strokeText(p.title || '', 256, 100); g.fillStyle = '#efe6d2'; g.fillText(p.title || '', 256, 100);
     const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
@@ -297,6 +314,7 @@
       R = { nid: p.nid, vis, tag, lookKey, cosKey, tx: p.x, ty: p.y, tz: p.z, tyaw: p.yaw || 0, spd: 0, mode: 'walk', emoteT: 0, ride: null };
       N.remotes.set(p.nid, R);
     }
+    R.lastP = p;
     if (R.cosKey !== cosKey && R.ride) { const md = R.mode; R.mode = null; R.cos = p.cos || {}; setMode(R, md); }
     Object.assign(R, { name: p.name, title: p.title, k: p.k, army: p.army, inside: p.in, cos: p.cos || {}, cosKey });
     if (!update) { R.tx = p.x; R.ty = p.y; R.tz = p.z; }
@@ -358,10 +376,10 @@
   function buildUI() {
     if ($('aocChat')) return;
     const d = document.createElement('div'); d.id = 'aocChat'; d.className = 'glass';
-    d.innerHTML = `<div class="aochead"><div class="aoctabs">${['all', 'global', 'local', 'kingdom', 'army', 'pm'].map(t => `<button data-tab="${t}" class="${t === 'all' ? 'on' : ''}">${t === 'all' ? 'All' : CH_NAMES[t]}</button>`).join('')}</div>
+    d.innerHTML = `<div class="aochead"><div class="aoctabs">${['all', 'global', 'local', 'kingdom', 'army', 'squad', 'pm'].map(t => `<button data-tab="${t}" class="${t === 'all' ? 'on' : ''}">${t === 'all' ? 'All' : CH_NAMES[t]}</button>`).join('')}</div>
       <span id="aocLink" class="aoclinkdot" title="Connection"></span><button id="aocMin" title="Hide or show chat">▾</button></div>
       <div id="aocLog" class="aoclog" aria-live="polite"></div>
-      <form id="aocForm" autocomplete="off"><select id="aocCh" aria-label="Channel">${['global', 'local', 'kingdom', 'army', 'pm'].map(c => `<option value="${c}">${CH_NAMES[c]}</option>`).join('')}</select>
+      <form id="aocForm" autocomplete="off"><select id="aocCh" aria-label="Channel">${['global', 'local', 'kingdom', 'army', 'squad', 'pm'].map(c => `<option value="${c}">${CH_NAMES[c]}</option>`).join('')}</select>
       <input id="aocTo" placeholder="To" maxlength="24" class="hidden" aria-label="Recipient"><input id="aocMsg" maxlength="240" placeholder="Press Enter to chat" aria-label="Message" enterkeyhint="send"><button type="submit" class="aocsend" title="Send (Enter)" aria-label="Send">➤</button></form>`;
     document.body.appendChild(d);
     const bar = document.createElement('div'); bar.id = 'aocBar';
@@ -370,7 +388,7 @@
     const pr = document.createElement('div'); pr.id = 'aocPrompt'; pr.className = 'glass hidden'; document.body.appendChild(pr);
     $('aocRealmBtn').onclick = () => openRealm();
     $('aocMin').onclick = () => { N.chatOpen = !N.chatOpen; d.classList.toggle('min', !N.chatOpen); $('aocMin').textContent = N.chatOpen ? '▾' : '▴'; if (N.chatOpen) { N.unread = 0; badge(); } };
-    d.querySelectorAll('.aoctabs button').forEach(b => b.onclick = () => { N.chatTab = b.dataset.tab; d.querySelectorAll('.aoctabs button').forEach(x => x.classList.toggle('on', x === b)); filterLog(); if (['global', 'local', 'kingdom', 'army', 'pm'].includes(N.chatTab)) setCh(N.chatTab); });
+    d.querySelectorAll('.aoctabs button').forEach(b => b.onclick = () => { N.chatTab = b.dataset.tab; d.querySelectorAll('.aoctabs button').forEach(x => x.classList.toggle('on', x === b)); filterLog(); if (['global', 'local', 'kingdom', 'army', 'squad', 'pm'].includes(N.chatTab)) setCh(N.chatTab); });
     $('aocCh').onchange = () => setCh($('aocCh').value);
     const msg = $('aocMsg');
     msg.addEventListener('focus', () => { try { A().releaseMouse(); const k = A().keys; for (const c in k) k[c] = false; } catch (e) {} });
@@ -437,11 +455,13 @@
       { label: 'Salute', fn: () => { send({ t: 'emote', e: 'salute' }); A().closePanel(); } },
       { label: 'View their record', fn: () => send({ t: 'inspect', nid: R.nid }) },
     ];
+    const rr = N.roster.find(x => x.nid === R.nid) || R;
+    if (myAuth(rr) >= 0) { opts.push({ label: 'Set army rank', fn: () => promoteDialog(rr) }); opts.push({ label: 'Assign division', fn: () => corpsDialog(rr) }); }
+    if (N.wr && N.mil && rr.army === N.mil.army) for (const q of N.wr.sqs.filter(q => (N.wr.me.manage || []).includes(q[0]))) opts.push({ label: 'Add to squad ' + q[2], fn: () => { send({ t: 'wcmd', op: 'sqInv', sq: q[0], nid: R.nid }); A().closePanel(); } });
     if (N.mil && N.mil.regiment && N.mil.role !== 'member' && R.army === N.mil.army) opts.push({ label: 'Invite to ' + N.mil.regiment.name, fn: () => { send({ t: 'regInvite', nid: R.nid }); A().closePanel(); } });
     if (N.mil && N.mil.regiment && N.mil.role === 'commander') { opts.push({ label: 'Make regiment officer', fn: () => { send({ t: 'regRole', nid: R.nid, role: 'officer' }); A().closePanel(); } }); opts.push({ label: 'Dismiss from regiment', fn: () => { send({ t: 'regRole', nid: R.nid, role: 'kick' }); A().closePanel(); } }); }
     const myK = N.you && N.you.kingdom;
     const marshal = N.offices.some(o => (o.office === 'marshal' || o.office === 'monarch') && o.k === R.army);
-    if ((marshal || (N.you && N.you.admin)) && R.army >= 0) opts.push({ label: 'Set army rank', fn: () => promoteDialog(R) });
     if (N.offices.some(o => o.office === 'monarch' && o.k === myK) && R.k === myK) opts.push({ label: 'Appoint to office', fn: () => appointDialog(R) });
     A().openPanel(R.name, R.title || '', `<p class="aocsmall">${esc(A().K[R.k] ? 'Citizen of ' + A().K[R.k].name : '')}${R.army >= 0 ? ' · serves in the ' + esc(A().K[R.army].name) + ' Army' : ''}</p>`, opts);
   }
@@ -450,10 +470,14 @@
       { label: 'Hand it over', primary: true, fn: () => { const v = Math.floor(+$('aocGive').value); if (v > 0) send({ t: 'give', nid: R.nid, gold: v }); A().closePanel(); } },
       { label: 'Back', fn: () => playerMenu(R) }]);
   }
+  function corpsDialog(R) {
+    A().openPanel('Assign division', R.name, `<select id="aocCorps" class="aocin">${Object.entries(CORPS_N).map(([id, n]) => `<option value="${id}" ${(R.corps || 'line') === id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><p class="aocsmall">Only a Lieutenant or higher (senior to the soldier), the Marshal, the Monarch or an admin can assign divisions.</p>`, [
+      { label: 'Assign', primary: true, fn: () => { send({ t: 'armyCorps', nid: R.nid, corps: $('aocCorps').value }); A().closePanel(); } }, { label: 'Back', fn: () => playerMenu(R) }]);
+  }
   function promoteDialog(R) {
     const ranks = A().RANKS;
-    const top = N.you && N.you.admin ? ranks.length - 1 : A().WARRANT_R;
-    A().openPanel('Set army rank', R.name, `<select id="aocRank" class="aocin">${ranks.slice(0, top + 1).map((r, i) => `<option value="${i}">${esc(r.n)}</option>`).join('')}</select>${top < ranks.length - 1 ? '<p class="aocsmall">Ranks above Warrant Officer are appointed by admins.</p>' : ''}`, [
+    const top = Math.max(0, myAuth(R));
+    A().openPanel('Set army rank', R.name, `${R.rank >= 0 ? `<p class="aocsmall">Now: ${esc(ranks[R.rank] ? ranks[R.rank].n : '')}</p>` : ''}<select id="aocRank" class="aocin">${ranks.slice(0, top + 1).map((r, i) => `<option value="${i}" ${i === R.rank ? 'selected' : ''}>${esc(r.n)}</option>`).join('')}</select><p class="aocsmall">You can give ranks up to ${esc(ranks[top].n)}.</p>`, [
       { label: 'Confirm', primary: true, fn: () => { send({ t: 'armyPromote', nid: R.nid, rank: +$('aocRank').value }); A().closePanel(); } }, { label: 'Back', fn: () => playerMenu(R) }]);
   }
   function appointDialog(R) {
@@ -507,6 +531,105 @@
     const panel = $('panel'); if (panel && !panel._aocWatch) { panel._aocWatch = true; new MutationObserver(() => { if (panel.classList.contains('hidden')) N.realmOpen = false; }).observe(panel, { attributes: true, attributeFilter: ['class'] }); }
   }
   const btn = (act, text, data = {}, cls = '') => `<button class="btn ${cls}" data-act="${act}" ${Object.entries(data).map(([k, v]) => `data-${k}="${esc(v)}"`).join(' ')}>${text}</button>`;
+  // ------------------------------------------------------------------ the chain of command: ranks, insignia, companies and squads
+  const RANK_TIER = ['Enlisted', 'Enlisted', 'Enlisted', 'Enlisted', 'Non-commissioned officer', 'Non-commissioned officer', 'Warrant officer', 'Commissioned officer', 'Commissioned officer', 'Commissioned officer', 'High command', 'High command'];
+  const RANK_INFO = [
+    ['Enlist with a recruiter in any capital.', 'Serve in a company and join a squad when an officer adds you.'],
+    ['3 merit, earned in battle.', 'Serve in a company and a squad.'],
+    ['8 merit.', 'Serve in a company and a squad.'],
+    ['15 merit. The highest rank merit alone can earn.', 'The senior soldier of a squad.'],
+    ['Promoted by a Lieutenant or higher.', 'Can be made squad leader and raise a regiment.'],
+    ['Promoted by a Lieutenant or higher.', 'Leads a squad; an officer\'s right hand in a company.'],
+    ['Promoted by a Lieutenant or higher.', 'The senior NCO of a company; keeps the squads in order.'],
+    ['Commissioned by a Captain or higher.', 'Commands 1 company. Forms squads, assigns divisions, promotes juniors up to Warrant Officer.'],
+    ['Commissioned by a Major or higher.', 'Commands 2 companies. Promotes up to Lieutenant.'],
+    ['Commissioned by a Colonel or higher.', 'Commands 4 companies. Promotes up to Captain.'],
+    ['Appointed by a General, the Marshal or the Monarch.', 'Commands the whole army and enlists recruits. Promotes up to Major.'],
+    ['Appointed by the realm\'s admins.', 'Full command: builds forts and can hand the army to the Lord Marshal. Promotes up to Colonel.']];
+  const TIERS = [['Enlisted', 0, 3, '#6fae55'], ['Non-commissioned officers', 4, 5, '#d1a73a'], ['Warrant officer', 6, 6, '#de8a3c'], ['Commissioned officers', 7, 9, '#5b93d1'], ['High command', 10, 11, '#b061d6']];
+  function rankSvg(i, px = 40) {
+    const G = '#f0c75e', D = '#5a3d0c';
+    const chev = y => `<path d="M11 ${y + 10} L30 ${y} L49 ${y + 10}" fill="none" stroke="${G}" stroke-width="4.6" stroke-linejoin="miter"/>`;
+    const rock = y => `<path d="M11 ${y} Q30 ${y + 10} 49 ${y}" fill="none" stroke="${G}" stroke-width="4.6"/>`;
+    const pip = (x, y, R = 6.5) => { let d = ''; for (let k = 0; k < 16; k++) { const a = Math.PI * k / 8 - Math.PI / 2, r = k % 2 ? R * .45 : R; d += (k ? 'L' : 'M') + (x + Math.cos(a) * r).toFixed(1) + ' ' + (y + Math.sin(a) * r).toFixed(1); } return `<path d="${d}Z" fill="${G}" stroke="${D}" stroke-width=".8"/>`; };
+    const crown = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-12 5 L-14 -8 L-6 -1 L0 -12 L6 -1 L14 -8 L12 5 Z" fill="${G}" stroke="${D}" stroke-width="1.2"/><rect x="-12.5" y="5" width="25" height="5" rx="1" fill="${G}" stroke="${D}" stroke-width="1.1"/><circle cx="0" cy="-12" r="2" fill="${G}"/></g>`;
+    const B = [
+      `<rect x="16" y="22" width="28" height="16" rx="3" fill="none" stroke="${G}" stroke-width="3" opacity=".5"/>`,
+      chev(25), chev(18) + chev(30), chev(12) + chev(24) + chev(36),
+      chev(7) + chev(18) + chev(29) + rock(42), chev(4) + chev(14) + chev(24) + rock(37) + rock(47),
+      `<circle cx="30" cy="31" r="19" fill="none" stroke="${G}" stroke-width="3" stroke-dasharray="4 2.6"/>` + crown(30, 32, .95),
+      pip(30, 20) + pip(30, 41), pip(30, 13) + pip(30, 30) + pip(30, 47),
+      crown(30, 31, 1.35), crown(30, 17, .95) + pip(30, 37, 5.5) + pip(30, 50, 5.5),
+      `<path d="M13 51 L47 15 M47 51 L13 15" stroke="${G}" stroke-width="3.6" stroke-linecap="round"/><path d="M10 47 l8 8 M50 47 l-8 8" stroke="${G}" stroke-width="3.2"/>` + crown(30, 15, .7)];
+    return `<svg class="aocrk" viewBox="0 0 60 60" width="${px}" height="${px}" role="img" aria-label="${esc(A().RANKS[i] ? A().RANKS[i].n : '')} insignia"><rect x="1.5" y="1.5" width="57" height="57" rx="9" fill="#1d2838" stroke="#8a6a2a" stroke-width="2"/>${B[i] || ''}</svg>`;
+  }
+  // the highest rank I may give this soldier (online roster row), or -1; the server checks the same rule
+  function myAuth(r) {
+    const me = N.you; if (!me || !r || r.army < 0 || r.army === undefined) return -1; if (me.admin) return A().RANKS.length - 1;
+    if (r.nid === me.nid) return -1;
+    if (N.offices.some(o => (o.office === 'monarch' || o.office === 'marshal') && o.k === r.army)) return A().RANKS.indexOf(A().RANKS.find(x => x.n === 'Colonel'));
+    const m = N.mil; if (!m || m.army !== r.army || m.rank < 7 || !(r.rank < m.rank)) return -1; return m.rank - 1;
+  }
+  const milTyping = () => { const a = document.activeElement; return !!(a && /^aoc(SqN|SqC|SqI|SqM|PR|PC)/.test(a.id || '')); };
+  function rankChart() {
+    const RK = A().RANKS;
+    return `${btn('armyView', '← Back to my army', { v: '' })}
+      <h3 class="cz" style="margin:10px 0 2px">Ranks of the Four Armies</h3>
+      <p class="aocsmall">One chain of command for every real soldier. Merit earned in battle carries you up to Corporal. From Sergeant up, a senior officer promotes you. Officers can only promote or demote soldiers junior to them, and only up to one rank below their own. The Marshal and the Monarch can appoint up to Colonel; Generals are made by the realm's admins.</p>
+      <div class="aocrkchart">${TIERS.map(([n, a, b, c]) => `<div class="aocrktier" style="--tc:${c}"><div class="aocrktn">${n}</div>${RK.slice(a, b + 1).map((r, j) => { const i = a + j; return `<div class="aocrkrow">${rankSvg(i, 46)}<div class="aocrkt"><b>${esc(r.n)}</b><div class="aocsmall"><b>Earned:</b> ${esc(RANK_INFO[i][0])}</div><div class="aocsmall"><b>Duties:</b> ${esc(RANK_INFO[i][1])}</div></div></div>`; }).join('')}</div>`).join('')}</div>
+      <p class="aocsmall"><b>Divisions:</b> every soldier starts in the Line Infantry. Only a Lieutenant or higher (senior to the soldier), the Marshal, the Monarch or an admin can move a soldier to the Storm Troopers, the Heavy Infantry or the Snipers.</p>
+      <p class="aocsmall"><b>Companies and squads:</b> any soldier can join a company of their army. Officers form squads inside companies and add soldiers to them. A squad has a leader (often an NCO), its own chat channel, and its members are marked ◆ in blue.</p>`;
+  }
+  function armyTab() {
+    const m = N.mil, RK = A().RANKS, K = A().K;
+    if (N.armyView === 'ranks') return rankChart();
+    if (!m) return `<p>You are not a soldier. Visit the recruiter in any capital to enlist; your rank, company and squad are then kept by the server, and army chat opens to you.</p>${btn('armyView', 'See the ranks of the army', { v: 'ranks' })}`;
+    const wr = N.wr || { cos: {}, sqs: [], me: {} }, me = wr.me || {};
+    const W = window.AOC_WORLD, cos = W && W.companies ? W.companies(m.army) : [];
+    const coName = id => { const c = cos.find(x => x.id === id); return c ? c.name : 'Company ' + id; };
+    const sqName = id => { const q = wr.sqs.find(x => x[0] === id); return q ? q[2] : ''; };
+    const rosRow = e => `<tr><td style="width:30px">${rankSvg(e[1], 28)}</td><td><b>${esc(e[0])}</b>${e[5] ? ' <i class="aocsmall" style="color:var(--gold)">squad leader</i>' : ''}<br><i class="aocsmall">${esc(RK[e[1]] ? RK[e[1]].n : '')} · ${esc(CORPS_N[e[2]] || 'Line Infantry')}</i></td><td class="aocsmall">${e[3] ? '◆ ' + esc(sqName(e[3])) : '<i>no squad</i>'}</td><td><span class="aocdot ${e[4] ? 'on' : ''}" title="${e[4] ? 'online' : 'offline'}"></span></td></tr>`;
+    let out = `<div class="aocrkhead">${rankSvg(m.rank, 58)}<div><b class="cz" style="font-size:1.15em">${esc(m.rankName)}</b> <span class="aocsmall">· ${esc(RANK_TIER[m.rank] || '')}</span><br>${esc(CORPS_N[m.corps] || 'Line Infantry')} · ${esc(K[m.army].name)} Army${me.co != null ? ' · ' + esc(coName(me.co)) : ''}${me.sq ? ' · squad ' + esc(sqName(me.sq)) : ''}<br><span class="aocsmall">${esc(RANK_INFO[m.rank] ? RANK_INFO[m.rank][1] : '')}</span></div></div>${btn('armyView', 'Ranks of the army', { v: 'ranks' })}`;
+    // company
+    out += '<div class="sect">Your company</div>';
+    if (!W || !W.on) out += '<p class="aocsmall">Companies appear once you have joined the shared realm.</p>';
+    else if (me.co != null) { const ros = wr.cos[me.co] || []; out += `<div class="aoccard"><b>${esc(coName(me.co))}</b> <span class="aocsmall">${ros.length} soldier${ros.length === 1 ? '' : 's'} on the roster</span> ${btn('coLeave', 'Leave company')}<div class="aoctablewrap"><table class="aoctable">${ros.map(rosRow).join('')}</table></div></div>`; }
+    else out += `<p>You are not in a company yet. Join one to march and fight beside it, share in its pay, and be placed in a squad.</p><table class="aoctable">${cos.map(c => `<tr><td><b>${esc(c.name)}</b><br><i class="aocsmall">${esc(c.div)} · ${c.str} soldiers in the field · ${(wr.cos[c.id] || []).length} players</i></td><td>${btn('coJoin', 'Join', { id: c.id })}</td></tr>`).join('') || '<tr><td><i>Your army has no companies in the field.</i></td></tr>'}</table>`;
+    // squads
+    const showAll = !!me.officer, sqs = wr.sqs.filter(q => showAll ? cos.some(c => c.id === q[1]) : q[1] === me.co);
+    const members = id => { const out = []; for (const list of Object.values(wr.cos)) for (const e of list) if (e[3] === id) out.push(e); return out; };
+    out += `<div class="sect">Squads${showAll ? ' of your army' : ' of your company'}</div>`;
+    out += sqs.map(q => { const ms = members(q[0]), mine = q[0] === me.sq, mgr = (me.manage || []).includes(q[0]);
+      const inv = mgr ? N.roster.filter(r => r.army === m.army && !ms.some(e => e[0] === r.name)) : [];
+      return `<div class="aoccard ${mine ? 'aocmine' : ''}"><b>◆ ${esc(q[2])}</b> <span class="aocsmall">${esc(coName(q[1]))} · leader ${q[3] ? esc(q[3]) : '<i>none</i>'} · ${q[4]}/10</span>
+        <div class="aocsmall" style="margin:3px 0">${ms.map(e => `${esc(RK[e[1]] ? RK[e[1]].n : '')} ${esc(e[0])}${e[4] ? '' : ' (away)'}`).join(' · ') || '<i>no soldiers yet</i>'}</div>
+        ${mine ? btn('sqLeave', 'Leave squad') : ''}
+        ${mgr ? `<div class="aocmil"><select id="aocSqI-${q[0]}" class="aocin aocsm" aria-label="Soldier to add">${inv.map(r => `<option value="${r.nid}">${esc(r.name)}${RK[r.rank] ? ' (' + esc(RK[r.rank].n) + ')' : ''}</option>`).join('') || '<option value="">no one online to add</option>'}</select>${btn('sqInv', 'Add soldier', { sq: q[0] })}</div>
+          ${ms.length ? `<div class="aocmil"><select id="aocSqM-${q[0]}" class="aocin aocsm" aria-label="Squad member">${ms.map(e => `<option value="${esc(e[0])}">${esc(e[0])}</option>`).join('')}</select>${btn('sqLead', 'Make leader', { sq: q[0] })}${btn('sqKick', 'Remove', { sq: q[0] })}</div>` : ''}
+          ${me.officer ? btn('sqDel', 'Disband', { sq: q[0] }, 'danger') : ''}` : ''}</div>`; }).join('') || `<p class="aocsmall">${me.co != null ? 'No squads in your company yet.' : 'Join a company to be placed in a squad.'} Officers (Lieutenant and up) form squads.</p>`;
+    if (me.officer && W && W.on) out += `<div class="aoccard"><b>Form a squad</b><input id="aocSqN" class="aocin" maxlength="30" placeholder="e.g. Red Section"><select id="aocSqC" class="aocin" aria-label="Company">${cos.map(c => `<option value="${c.id}" ${c.id === me.co ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>${btn('sqNew', 'Form squad', {}, 'primary')}<p class="aocsmall">You lead the new squad and join its company. Add soldiers, then hand the lead to an NCO if you like.</p></div>`;
+    // command over juniors
+    const subs = N.roster.filter(r => r.army >= 0 && r.army === m.army && myAuth(r) >= 0);
+    if (subs.length) out += `<div class="sect">Soldiers under your command (online)</div><div class="aoctablewrap"><table class="aoctable">${subs.map(r => { const cap = myAuth(r); return `<tr><td style="width:30px">${rankSvg(Math.max(0, r.rank), 28)}</td><td><b>${esc(r.name)}</b><br><i class="aocsmall">${esc(RK[r.rank] ? RK[r.rank].n : '')} · ${esc(CORPS_N[r.corps] || 'Line Infantry')}</i></td><td><div class="aocmil"><select id="aocPR-${r.nid}" class="aocin aocsm" aria-label="Rank for ${esc(r.name)}">${RK.slice(0, cap + 1).map((x, i) => `<option value="${i}" ${i === r.rank ? 'selected' : ''}>${esc(x.n)}</option>`).join('')}</select>${btn('setRank', 'Set rank', { nid: r.nid })}</div><div class="aocmil"><select id="aocPC-${r.nid}" class="aocin aocsm" aria-label="Division for ${esc(r.name)}">${Object.entries(CORPS_N).map(([id, n]) => `<option value="${id}" ${(r.corps || 'line') === id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${btn('setCorps', 'Assign division', { nid: r.nid })}</div></td></tr>`; }).join('')}</table></div>`;
+    else if (m.rank >= 7) out += '<p class="aocsmall">No soldiers junior to you are online right now. You can promote them and assign divisions from here or from the player menu (E beside them).</p>';
+    // the older player regiments stay available
+    out += '<div class="sect">Regiment</div>' + (m.regiment ? `<p>Regiment: <b>${esc(m.regiment.name)}</b> (${esc(m.role)}), commander ${esc(m.regiment.commander)} ${btn('regLeave', 'Leave regiment')}</p>`
+      : (m.rank >= 4 ? `<div class="aoccard"><b>Raise a regiment</b> (200 gold): a lasting band of players across companies.<input id="aocRN" class="aocin" maxlength="40" placeholder="e.g. The 3rd Frostguard Fusiliers">${btn('regCreate', 'Raise regiment')}</div>` : '<p class="aocsmall">Sergeants and above can raise their own regiment.</p>'));
+    return out;
+  }
+  const MILACT = {
+    armyView: d => { N.armyView = d.v || ''; renderRealm(); },
+    coJoin: d => send({ t: 'wcmd', op: 'join', id: +d.id }),
+    coLeave: () => send({ t: 'wcmd', op: 'leave' }),
+    sqNew: (d, v) => send({ t: 'wcmd', op: 'sqNew', id: +v('aocSqC'), name: v('aocSqN') }),
+    sqInv: (d, v) => { const n = +v('aocSqI-' + d.sq); if (!n) return toast('No one online to add.'); send({ t: 'wcmd', op: 'sqInv', sq: +d.sq, nid: n }); },
+    sqLead: (d, v) => send({ t: 'wcmd', op: 'sqLead', sq: +d.sq, name: v('aocSqM-' + d.sq) }),
+    sqKick: (d, v) => send({ t: 'wcmd', op: 'sqKick', sq: +d.sq, name: v('aocSqM-' + d.sq) }),
+    sqLeave: () => send({ t: 'wcmd', op: 'sqLeave' }),
+    sqDel: d => { const b = document.querySelector(`[data-act="sqDel"][data-sq="${d.sq}"]`); if (b && !b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Really disband?'; return; } send({ t: 'wcmd', op: 'sqDel', sq: +d.sq }); },
+    setRank: (d, v) => send({ t: 'armyPromote', nid: +d.nid, rank: +v('aocPR-' + d.nid) }),
+    setCorps: (d, v) => send({ t: 'armyCorps', nid: +d.nid, corps: v('aocPC-' + d.nid) }),
+  };
   const RT = {
     players() {
       const p = P();
@@ -540,16 +663,7 @@
         ${btn('motion', 'Table motion')}</div>` : '<p class="aocsmall">Only office holders sit in Parliament. Win an election (Kingdom tab) to take a seat.</p>';
       return (ms || '<p><i>No motions are before Parliament.</i></p>') + form;
     },
-    army() {
-      const m = N.mil;
-      if (!m) return '<p>You are not a soldier. Visit the marshal in any capital to enlist; your army membership and rank are then kept by the server, and army chat opens to you.</p>';
-      const K = A().K;
-      const reg = m.regiment ? `<p>Regiment: <b>${esc(m.regiment.name)}</b> (${esc(m.role)}), commander ${esc(m.regiment.commander)}</p>${btn('regLeave', 'Leave regiment')}`
-        : (m.rank >= 4 ? `<div class="aoccard"><b>Raise a regiment</b> (200 gold)<input id="aocRN" class="aocin" maxlength="40" placeholder="e.g. The 3rd Frostguard Fusiliers">${btn('regCreate', 'Raise regiment')}</div>` : '<p class="aocsmall">Sergeants and above can raise their own regiment.</p>');
-      return `<p><b>${esc(m.rankName)}</b> of the ${esc(K[m.army].name)} Army.</p>${reg}
-        <p class="aocsmall">Regiments in your army: ${N.regiments.map(r => esc(r.name)).join(', ') || 'none yet'}.</p>
-        <p class="aocsmall">Commanders and officers invite soldiers from the player menu (E beside them). The Marshal and Monarch can set any soldier's rank.</p>`;
-    },
+    army() { return armyTab(); },
     events() {
       const p = P(); const evs = [...N.events.values()];
       return evs.length ? evs.map(e => `<div class="aoccard"><b>⚑ ${esc(e.title)}</b><br><span class="aocsmall">${Math.round(Math.hypot(e.x - p.pos.x, e.z - p.pos.z))} paces away · ends in ${left(e.ends)} · ${e.count} joined · reward ${e.reward} gold</span><br>${btn('eventJoin', 'Join', { id: e.id })}${btn('eventMap', 'Show on map', { id: e.id })}</div>`).join('')
@@ -597,11 +711,12 @@
       return `<p>Signed in as <b>${esc(N.session && N.session.user ? N.session.user.email : '')}</b></p><p>Character: <b>${esc(N.you ? N.you.name : '')}</b>, citizen of ${esc(K[k].name)}</p>
         <div class="aoccard"><b>Change kingdom</b> (once a day; you give up any office)<select id="aocKS" class="aocin">${K.map((x, i) => `<option value="${i}" ${i === k ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>${btn('kingdom', 'Swear allegiance')}</div>
         ${btn('logout', 'Save and log out', {}, 'primary')}
-        <p class="aocsmall">Chat: Enter to type, / for commands (/w Name message, /g, /l, /k, /a, /online). Your progress is saved to your account automatically.</p>`;
+        <p class="aocsmall">Chat: Enter to type, / for commands (/w Name message, /g, /l, /k, /a, /s for squad, /online). Your progress is saved to your account automatically.</p>`;
     },
   };
   function act(a, d) {
     const v = id => { const el = $(id); return el ? el.value : ''; };
+    if (MILACT[a]) return MILACT[a](d, v);
     if (a === 'pm') { A().closePanel(); N.realmOpen = false; setCh('pm'); $('aocTo').value = d.name; $('aocMsg').focus(); }
     else if (a === 'elecCall') send({ t: 'elecCall', office: d.office });
     else if (a === 'elecStand') send({ t: 'elecStand', id: +d.id });

@@ -26,9 +26,12 @@ module.exports = function makeWorld(ctx) {
   const CAPS = { foot: 100, guns: 200, horse: 500 };
   const UNITCOST = { foot: 4, horse: 7, guns: 9 };
   const TBASE = { capital: 120, city: 70, town: 45, village: 22, market: 0 };
-  const DIVS = { foot: { line: [1, 1, 1], shock: [1.3, .85, 1.2], light: [1.05, .9, 1.3], grenadier: [1.1, 1.25, .9], guard: [1.15, 1.15, 1] },
+  const DIVS = { foot: { line: [1, 1, 1], storm: [1.3, .85, 1.2], heavy: [1.1, 1.3, .85], sniper: [1.25, .8, .95], raider: [1.2, .9, 1.3], gas: [1.1, 1.15, 1], flamer: [1.45, 1.05, .95], ranger: [1.05, .9, 1.3], aviator: [.95, .85, 1.45] },
+    // the infantry divisions are the corps; companies saved under the old names are renamed when the world loads
     horse: { hussar: [1, .9, 1.3], dragoon: [1.05, 1, 1.1], cuirassier: [1.35, 1.25, .9] }, guns: { field: [1, 1, 1], horse: [.85, .9, 1.6], siege: [1.2, .9, .7] } };
   const DIV0 = { foot: 'line', horse: 'dragoon', guns: 'field' };
+  const DIVMAP = { shock: 'storm', grenadier: 'heavy', light: 'ranger', guard: 'gas' };
+  const FOOTMIX = ['line', 'line', 'line', 'storm', 'heavy', 'sniper', 'raider', 'gas', 'flamer', 'ranger', 'aviator'];   // what the AI raises
   const FORMS = ['line', 'column', 'square', 'skirmish'], STANCES = ['attack', 'defend', 'hold'];
   const PERS = { warlike: { agg: .85, dip: .3, greed: .5, caut: .25 }, diplomatic: { agg: .2, dip: .9, greed: .35, caut: .6 }, mercantile: { agg: .35, dip: .6, greed: .85, caut: .5 }, cautious: { agg: .2, dip: .5, greed: .4, caut: .9 }, scheming: { agg: .55, dip: .45, greed: .6, caut: .45 } };
   const POL = { conscript: { appr: -6, mil: 1.2 }, freetrade: { inc: -.15, rel: 1 }, tolls: { inc: .2, appr: -3, rel: -1 }, subsidy: { appr: 10, cost: 80 }, martial: { appr: -10, stab: 4 }, bounty: { cost: 60 }, press: { appr: 4, stab: -1 }, guilds: { cost: 50 }, borders: { stab: 3, rel: -2 }, tithe: { cost: 40, appr: 2 }, schools: { cost: 70, stab: 2, appr: 3 }, levy: { inc: .12, appr: -5 } };
@@ -79,7 +82,7 @@ module.exports = function makeWorld(ctx) {
     const ord = o.type === 'siege' || o.type === 'garrison' ? { type: o.type, town: TOWNS[o.town] ? o.town : capOf(r.k).i } : o.type === 'move' && Number.isFinite(o.x) ? { type: 'move', x: o.x, z: o.z } : { type: 'hold' };
     const cmd = r.cmd && typeof r.cmd === 'object' ? { name: String(r.cmd.name || '').slice(0, 40) || `${pick(FIRST)} ${pick(LAST)}`, rank: String(r.cmd.rank || 'Colonel').slice(0, 20), skill: clamp(num(r.cmd.skill, 2), 1, 5), fame: num(r.cmd.fame, 0), wins: num(r.cmd.wins, 0), losses: num(r.cmd.losses, 0) } : newCmd();
     return { id: Math.round(num(r.id, 0)), k: r.k, type, name: String(r.name || '').slice(0, 40), str: Math.max(0, Math.round(num(r.str, 0))), mor: clamp(num(r.mor, 80), 0, 100), x: num(r.x, 0), z: num(r.z, 0), yaw: num(r.yaw, 0), home: TOWNS[r.home] ? r.home : capOf(r.k).i, order: ord, sieg: clamp(num(r.sieg, 0), 0, 1),
-      div: DIVS[type][r.div] ? r.div : DIV0[type], form: FORMS.includes(r.form) ? r.form : (type === 'horse' ? 'column' : 'line'), stance: STANCES.includes(r.stance) ? r.stance : 'attack', cmd, busy: false, rout: false, routT: 0 };
+      div: DIVS[type][type === 'foot' && DIVMAP[r.div] ? DIVMAP[r.div] : r.div] ? (type === 'foot' && DIVMAP[r.div] ? DIVMAP[r.div] : r.div) : DIV0[type], form: FORMS.includes(r.form) ? r.form : (type === 'horse' ? 'column' : 'line'), stance: STANCES.includes(r.stance) ? r.stance : 'attack', cmd, busy: false, rout: false, routT: 0 };
   }
   function newCmd() { return { name: `${pick(FIRST)} ${pick(LAST)}`, rank: 'Colonel', skill: 1 + Math.round(rr() * 4), fame: 0, wins: 0, losses: 0 }; }
   const divOf = R => DIVS[R.type][R.div] || DIVS[R.type][DIV0[R.type]];
@@ -87,7 +90,7 @@ module.exports = function makeWorld(ctx) {
     const used = W.regs.filter(r => r.k === k).map(r => r.name); let nm = '';
     for (let i = 0; i < 9 && !nm; i++) { const c = `${KN[k]} ${PFX[i] || (i + 1) + 'th'} ${type === 'horse' ? 'Cavalry Troop' : type === 'guns' ? 'Battery' : 'Foot Company'}`; if (!used.includes(c)) nm = c; }
     const R = cleanReg({ id: ++regId, k, type, name: nm, str: n, mor: 80, x: t.x + (rr() - .5) * 20, z: t.z + (rr() - .5) * 20, home: t.i, order: { type: 'garrison', town: t.i } });
-    R.cmd = newCmd(); W.regs.push(R); return R;
+    R.cmd = newCmd(); if (type === 'foot') R.div = pick(FOOTMIX); W.regs.push(R); return R;
   }
   function reorg() {
     for (let k = 0; k < 4; k++) for (const ty of ['foot', 'horse', 'guns']) {
@@ -157,7 +160,7 @@ module.exports = function makeWorld(ctx) {
     }
   }
   const shaken = R => R.lastRout !== undefined && W.t - R.lastRout < .25 && R.str < FIELD[R.type].size * .6; // regrouping after a rout: out of the fight
-  function casualty(R, n) { R.str = Math.max(0, R.str - n); R.mor = Math.max(0, R.mor - n * 3.2 / (R.div === 'guard' ? 1.7 : 1)); dirty = true; }
+  function casualty(R, n) { R.str = Math.max(0, R.str - n); R.mor = Math.max(0, R.mor - n * 3.2 / (R.div === 'gas' ? 1.7 : 1)); dirty = true; }
   function rout(R, Wn) {
     if (R.rout) return; R.rout = true; R.lastRout = W.t; R.routT = 45; R.busy = false; retreat(R); if (R.str > 0) news(`The ${R.name} break and flee${Wn ? ` from the ${Wn.name}` : ''}! ${R.str} of them get away.`, 'bad');
     if (Wn) { Wn.cmd.wins++; Wn.cmd.fame += 4; R.cmd.losses++; W.ws[Wn.k][R.k] += 4; Wn.mor = Math.min(100, Wn.mor + 8); W.ai[R.k].stab = Math.max(5, W.ai[R.k].stab - 2); setRel(Wn.k, R.k, W.rel[Wn.k][R.k] - 3);

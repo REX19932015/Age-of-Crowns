@@ -72,6 +72,7 @@ const ESTATE_PRICE = 2500, ESTATES_PER_TOWN = 4, REGIMENT_PRICE = 200, MAX_HOUSE
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const now = () => Date.now();
 let SEA = null;   // seasons, battle pass and story (server/season.js); set up after the helpers below
+let WORLD = null; // the shared realm: politics, news and armies (server/world.js)
 const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(Number(v) || 0)));
 const str = (v, max) => (typeof v === 'string' ? v : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
 const fin = v => typeof v === 'number' && Number.isFinite(v);
@@ -421,6 +422,7 @@ async function enterWorld(S) {
   });
   sendOffices(S);
   if (SEA) await SEA.onEnter(S);
+  if (WORLD) WORLD.onEnter(S);
   log(`${c.name} entered the world (${online.size} online)`);
 }
 async function leaveWorld(S) {
@@ -431,6 +433,7 @@ async function leaveWorld(S) {
   if (S.trade) cancelTrade(S.trade, `${S.char.name} left.`);
   for (const O of online.values()) if (O.seen.delete(S.nid)) send(O, { t: 'pl', nid: S.nid });
   if (SEA) await SEA.onLeave(S);
+  if (WORLD) WORLD.onLeave(S);
   S.dirty = true; await flush(S);
   log(`${S.char.name} left (${online.size} online)`);
 }
@@ -981,6 +984,12 @@ for (const [k, fn] of Object.entries(SEA.handlers)) H[k] = fn;
 let seaBusy = false, seaLast = now();
 setInterval(async () => { if (seaBusy) return; seaBusy = true; const t = now(); try { await SEA.tick((t - seaLast) / 1000); } catch (e) { log('season tick error', e.stack || e.message); } seaLast = t; seaBusy = false; }, 1000);
 
+// ---------------------------------------------------------------- the shared realm
+WORLD = require('./world')({ db, log, each, send, err, toast, online, offices, nameOf, TOWNS, KNAMES, RANKS, changeGold });
+for (const [k, fn] of Object.entries(WORLD.handlers)) H[k] = fn;
+let wLast = now();
+setInterval(() => { const t = now(); try { WORLD.tick(Math.min(2, (t - wLast) / 1000)); } catch (e) { log('world tick error', e.stack || e.message); } wLast = t; }, 250);
+
 let lastTick = now();
 setInterval(tickMovement, 100);
 setInterval(tickRoster, 3000);
@@ -996,10 +1005,10 @@ setInterval(() => { for (const S of online.values()) { if (!S.ws.alive) { S.ws.c
 let nextEvent = now() + CFG.EVENT_EVERY_MIN * 60000;
 setInterval(() => { if (now() > nextEvent) { nextEvent = now() + CFG.EVENT_EVERY_MIN * 60000; if (online.size) startEvent('season'); } }, 5000);
 
-async function shutdown() { log('saving everyone and shutting down…'); if (SEA) await SEA.flushAll().catch(() => {}); for (const S of online.values()) { S.dirty = true; await flush(S); } process.exit(0); }
+async function shutdown() { log('saving everyone and shutting down…'); if (SEA) await SEA.flushAll().catch(() => {}); if (WORLD) await WORLD.save().catch(() => {}); for (const S of online.values()) { S.dirty = true; await flush(S); } process.exit(0); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
 
-loadRealm().then(() => SEA.init()).then(() => server.listen(CFG.PORT, () => log(`Age of Crowns server listening on port ${CFG.PORT}`)))
+loadRealm().then(() => SEA.init()).then(() => WORLD.init()).then(() => server.listen(CFG.PORT, () => log(`Age of Crowns server listening on port ${CFG.PORT}`)))
   .catch(e => { console.error('Could not load the realm from Supabase. Did you run supabase/schema.sql?\n', e.message); process.exit(1); });
 
 module.exports = { server, CFG };

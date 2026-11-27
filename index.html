@@ -394,7 +394,7 @@ const RANKS=[{n:'Recruit',m:0},{n:'Private',m:3},{n:'Lance Corporal',m:8},{n:'Co
 // merit carries a soldier up to Warrant Officer; every rank above it is granted by an admin
 const WARRANT_R=6,OFFICER_R=7,COLONEL_R=10;
 // specialised corps: their helmet, gear and the perk weapon each one carries
-const CORPS={line:{n:'Line Infantry',hat:'stahlhelm',gun:null,arm:0},storm:{n:'Storm Troopers',hat:'stahlhelm',gun:'storm',arm:0},heavy:{n:'Heavy Infantry',hat:'heavyhelm',gun:'tankgun',arm:.25},raider:{n:'Trench Raiders',hat:'raiderhelm',gun:'trenchgun',arm:.1},gas:{n:'Gas Sentinels',hat:'gashelm',gun:'semiauto',arm:.05},flamer:{n:'Flame Pioneers',hat:'flamehelm',gun:'flamer',arm:.15},ranger:{n:'Frost Rangers',hat:'snowhood',gun:'marksman',arm:0},aviator:{n:'Sky Corps',hat:'flycap',gun:'autopistol',arm:0},cuirassier:{n:'Royal Cuirassiers',hat:'cuirhelm',gun:'cavcarbine',arm:.3}};
+const CORPS={line:{n:'Line Infantry',hat:'stahlhelm',gun:null,arm:0},storm:{n:'Storm Troopers',hat:'stahlhelm',gun:'storm',arm:0},heavy:{n:'Heavy Infantry',hat:'heavyhelm',gun:'tankgun',arm:.25},sniper:{n:'Snipers',hat:'ghillie',gun:'sniper',arm:0},raider:{n:'Trench Raiders',hat:'raiderhelm',gun:'trenchgun',arm:.1},gas:{n:'Gas Sentinels',hat:'gashelm',gun:'semiauto',arm:.05},flamer:{n:'Flame Pioneers',hat:'flamehelm',gun:'flamer',arm:.15},ranger:{n:'Frost Rangers',hat:'snowhood',gun:'marksman',arm:0},aviator:{n:'Sky Corps',hat:'flycap',gun:'autopistol',arm:0},cuirassier:{n:'Royal Cuirassiers',hat:'cuirhelm',gun:'cavcarbine',arm:.3}};
 const corpsNow=()=>CORPS[P.corps]?P.corps:'line';
 const FIRST=['Pip','Bramble','Clover','Hazel','Barnaby','Thistle','Juniper','Wren','Fennel','Maple','Tobias','Mirabel','Rowan','Basil','Sorrel','Ember','Quill','Nutmeg','Percival','Tansy','Oswin','Marigold','Cedric','Poppy','Alder','Linden','Sage','Bryony','Corwin','Elspeth','Hob','Greta'];
 const LAST=['Whiskerton','Cheddarby','Longtail','Nibbleworth','Crumbsworth','Squeakley','Brambletail','Seedwhistle','Furrowby','Quickpaw','Greyfur','Copperwhisk','Holloway','Thimble','Acornfield','Pockettail'];
@@ -440,7 +440,7 @@ function mixHex(a,b,t){const c=new THREE.Color(a).lerp(new THREE.Color(b),t);ret
 // ================= GEOMETRY HELPERS =================
 
 // ================= GUN MODELS =================
-const GUNMUZ={musket:1.2,rifle:1.6,pistol:.52,blunderbuss:1.1,storm:1.05,marksman:1.62,tankgun:1.96,autopistol:.46,trenchgun:1.1,semiauto:1.32,flamer:1.15,cavcarbine:.98};
+const GUNMUZ={musket:1.2,rifle:1.6,pistol:.52,blunderbuss:1.1,storm:1.05,marksman:1.62,tankgun:1.96,autopistol:.46,trenchgun:1.1,semiauto:1.32,flamer:1.15,cavcarbine:.98,sniper:1.8};
 function finVB(v,gf){const fc=c=>{if(typeof c!=='string'||c[0]!=='#')return c;const C=new THREE.Color(c),hsl={};C.getHSL(hsl);const h=hsl.h*360;if(hsl.s<.14)return mixHex(gf.metal,c,.35);if(h>=12&&h<=42&&hsl.l<.42)return mixHex(gf.wood,c,.3);if(h>=30&&h<=62&&hsl.l>=.42&&hsl.s>.35)return mixHex(gf.brass,c,.2);return c;};return new Proxy(v,{get(o,p){if(p==='add')return(g,c,m,c2)=>o.add(g,fc(c),m,c2&&fc(c2));if(p==='tube')return(a,b,n,c,...r)=>o.tube(a,b,n,fc(c),...r);const x=o[p];return typeof x==='function'?x.bind(o):x;}});}
 function gunVB(v,ty){const st='#2b2d31',stL='#45484e',dark='#1c1d20',wd='#5a3a20',wdD='#3a2414',brass='#b08a3a';
  // First World War arms. The barrel runs up +y from the receiver at y=0; the stock hangs below and behind.
@@ -471,6 +471,10 @@ function gunVB(v,ty){const st='#2b2d31',stL='#45484e',dark='#1c1d20',wd='#5a3a20
  if(ty==='autopistol'){v.add(GB.cyl,st,TM(0,.05,.01,.02,.4,.02),stL);v.add(GB.boxc,st,TM(0,.06,.008,.04,.2,.05));
   v.add(GB.cylc,stL,TM(0,-.03,.045,.022,.05,.022,0,0,PI/2));v.add(GB.sphs,stL,TM(.032,-.03,.045,.018));v.add(GB.sphs,stL,TM(-.032,-.03,.045,.018));   // toggle
   v.add(GB.boxc,wd,TM(0,-.12,-.08,.042,.22,.075,.75,0,0),wdD);v.add(GB.boxc,dark,TM(0,-.2,-.14,.034,.04,.06,.75,0,0));v.add(GB.torus,st,TM(0,-.04,-.045,.03,.035,.3,0,PI/2,0));return;}
+ if(ty==='sniper'){boltArm(1.8,1.38,false);   // a long barrel, a big scope with sunshade, a cheek rest and a folded bipod
+  v.add(GB.cylc,'#1c1d20',TM(0,.2,.1,.038,.62,.038));v.add(GB.cylc,'#1c1d20',TM(0,.53,.1,.05,.1,.05));v.add(GB.cylc,'#1c1d20',TM(0,-.12,.1,.046,.08,.046));v.add(GB.cylc,'#6fa0c0',TM(0,.585,.1,.036,.006,.036));
+  for(const y of[.04,.36])v.add(GB.boxc,'#45484e',TM(0,y,.06,.03,.03,.05));v.add(GB.boxc,'#4a3a24',TM(0,-.26,-.02,.05,.14,.04));
+  for(const sx of[-1,1])v.add(GB.boxc,'#45484e',TM(sx*.025,1.05,-.05,.012,.32,.012,.05,0,sx*.08));v.add(GB.cylc,'#2b2d31',TM(0,1.86,0,.04,.1,.04));return;}
  if(ty==='trenchgun'){gunVB(v,'blunderbuss');v.add(GB.boxc,stL,TM(0,1.25,-.045,.01,.3,.035));v.add(GB.cone8,stL,TM(0,1.4,-.045,.012,.06,.03));return;}   // the raiders' gun takes a bayonet
  if(ty==='semiauto'){boltArm(1.32,1.06,false);v.add(GB.boxc,dark,TM(0,.02,-.1,.05,.2,.09));v.add(GB.boxc,dark,TM(0,-.08,-.13,.048,.04,.08));v.add(GB.cylc,stL,TM(0,.6,.045,.018,.5,.018));return;}   // box magazine and a gas tube
  if(ty==='cavcarbine'){boltArm(.95,.7,false);v.add(GB.cylc,stL,TM(.05,-.05,-.05,.01,.4,.01));v.add(GB.torus,stL,TM(.06,.1,-.05,.03,.03,.3,0,PI/2,0));return;}   // short barrel, saddle ring
@@ -1576,7 +1580,7 @@ const MOUSE_SDF={"v": 6970, "t": 14000, "i32": false, "pos": "gQeCIvTAGwfdIgDB0Q
 function skinMat(m,o){// a skinned body needs a skinning copy of any material put on it
  if(!o.isSkinnedMesh)return m;if(!m._sk){m._sk=m.clone();m._sk.skinning=true;}return m._sk;}
 const _muBase={},_muGeo=new Map();
-const SLEEKU=new Set(['line','storm','heavy','raider','gas','flamer','ranger','aviator','cuirassier']);
+const SLEEKU=new Set(['line','sniper','storm','heavy','raider','gas','flamer','ranger','aviator','cuirassier']);
 function unitOf(o){// soldiers wear a studio unit morph (Regiments, Great War Corps) from js/morphs.js: one seamless uniform + helmet + gear, skinned like the body; regions 1 uniform, 2 facings, 3 breeches take kingdom colours
 const M=window.MORPHS||{};let u=null;
  if(o.corps)u=SLEEKU.has(o.corps)?o.corps:'line';
@@ -1662,7 +1666,7 @@ function makeMouse(o){
   // the head, snout, nose, teeth and ears are one seamless surface (see mouseSkinGeo); whiskers and hats are added here
   for(const s of[-1,1]){const em=TM(s*.24,.28,-.08,1,1,1,-.2,s*.45,-s*.5);
   // long fine whiskers in two segments, plus brow whiskers
-   if(U==='ironmask'||U==='raider'||U==='gas'||U==='flamer'||U==='heavy')continue;   // a mask, wrap or jaw guard hides the whiskers
+   if(U==='ironmask'||U==='raider'||U==='gas'||U==='flamer'||U==='heavy'||U==='sniper')continue;   // a mask, wrap or jaw guard hides the whiskers
    if(o.hat==='ironmask'){v.add(GB.torus,'#2c2d2a',em.clone().multiply(TM(0,-.27,0,.11,.11,.16,PI/2,0,0)));continue;}   // the helm hides the whiskers; a ring seals each ear
    for(let k=0;k<6;k++){const yy=-.06+(k%3-1)*.022,zz=.5-Math.floor(k/3)*.035;const ry=-s*(.05+k*.07),rz=s*((k%3)-1)*.14;v.add(GB.boxc,'#f4f0e8',TM(s*.2,yy,zz-.06,.34,.0045,.0045,0,ry,rz));v.add(GB.boxc,'#e6e0d4',TM(s*.42,yy+((k%3)-1)*.02,zz-.17,.2,.0035,.0035,0,ry*1.6,rz*1.4));}
    v.add(GB.boxc,'#efe9df',TM(s*.17,.16,.22,.2,.0035,.0035,0,-s*.4,s*.35));}
@@ -2592,7 +2596,7 @@ addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==
  if(e.code==='Escape'){if(softLock){releaseMouse();}closePanel();closeModal();return;}
  if(uiOpen()){if(e.code==='KeyE'&&!$('panel').classList.contains('hidden'))closePanel();if(['KeyM','KeyJ','KeyH','Backquote'].includes(e.code))closeModal();return;}
  if(e.code==='KeyE')interact();if(e.code==='KeyF')melee();if(e.code==='Digit1')drinkTonic();if(e.code==='KeyM')openMap();if(e.code==='KeyJ')openJournal();if(e.code==='KeyO')openPolitics();if(e.code==='KeyN')openGazette();if(e.code==='KeyU')openGov();if(e.code==='KeyT')openOrders();if(e.code==='Comma')openSettings();if(e.code==='KeyR')toggleRide();if(e.code==='KeyI'&&state==='play'&&!uiOpen())takePhoto();if(e.code==='Digit2')cycleWeapon();if(e.code==='Digit3'&&state==='play'&&!uiOpen())driftKey();if(e.code==='KeyQ')throwGrenade();if(e.code==='KeyY')openStrategy();if(e.code==='KeyK')openWardrobe();if(e.code==='KeyH')openHelp();
- if(e.code==='Backquote')openAdmin();if(e.code==='KeyB'&&P.mode==='balloon')dropBomb();else if(e.code==='KeyB'&&P.items.airship&&(P.mode==='walk'||P.mode==='swim')&&!P.inside)startPilotAir();if(e.code==='Space'&&P.mode==='cannon')fireCannon();if(e.code==='KeyG'&&P.ruler>=0){if(NPCS.some(x=>x.unit==='army'))dismissUnit('army');else summonArmy();}if(e.code==='KeyL')setMlock(!mlock);if(e.code==='KeyP')toggleFP();if(e.code==='KeyV')toggleAim();if(e.code==='KeyX'&&P.mode==='travel')P.travel.skip=true;});
+ if(e.code==='Backquote')openAdmin();if(e.code==='KeyB'&&P.mode==='balloon')dropBomb();else if(e.code==='KeyB'&&P.items.airship&&(P.mode==='walk'||P.mode==='swim')&&!P.inside)startPilotAir();if(e.code==='Space'&&P.mode==='cannon')fireCannon();if(e.code==='KeyG'&&P.ruler>=0){if(NPCS.some(x=>x.unit==='army'))dismissUnit('army');else summonArmy();}if(e.code==='KeyL')setMlock(!mlock);if(e.code==='KeyP')toggleFP();if(e.code==='KeyV')toggleAim();if(e.code==='KeyZ'&&!e.repeat&&state==='play'&&!uiOpen()&&curWeapon().scope&&(P.mode==='walk'||P.scope))toggleScope();if(e.code==='KeyX'&&P.mode==='travel')P.travel.skip=true;});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 canvas.addEventListener('mousedown',e=>{if(state!=='play'||uiOpen())return;initAudio();canvas.focus();
  if(mlock&&!locked&&!softLock&&!isTouch){lockMouse();return;}
@@ -2601,8 +2605,8 @@ canvas.addEventListener('mousedown',e=>{if(state!=='play'||uiOpen())return;initA
 addEventListener('mouseup',e=>{if(e.button===2)aimHeld=false;if(dragging&&e.button===0&&dragMoved<5&&!locked&&!softLock&&state==='play'&&!uiOpen())fire();dragging=false;});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===canvas;dragging=false;if(locked){softLock=false;document.body.classList.remove('soft');}else if(!softLock)aimMode=false;});
-addEventListener('mousemove',e=>{softMX=e.clientX;softMY=e.clientY;if(state!=='play')return;if(locked||(softLock&&!uiOpen())){camYaw-=(e.movementX||0)*.0024;camPitch=clamp(camPitch+(e.movementY||0)*.002,pMin(),1.3);}
- else if(dragging){const dx=e.clientX-lastMX,dy=e.clientY-lastMY;dragMoved+=Math.abs(dx)+Math.abs(dy);camYaw-=dx*.005;camPitch=clamp(camPitch+dy*.004,pMin(),1.3);lastMX=e.clientX;lastMY=e.clientY;}});
+addEventListener('mousemove',e=>{softMX=e.clientX;softMY=e.clientY;if(state!=='play')return;if(locked||(softLock&&!uiOpen())){const sens=P.scope?.14:1;camYaw-=(e.movementX||0)*.0024*sens;camPitch=clamp(camPitch+(e.movementY||0)*.002*sens,P.scope?-1.35:pMin(),1.3);}
+ else if(dragging){const dx=e.clientX-lastMX,dy=e.clientY-lastMY;dragMoved+=Math.abs(dx)+Math.abs(dy);{const sens=P.scope?.14:1;camYaw-=dx*.005*sens;camPitch=clamp(camPitch+dy*.004*sens,P.scope?-1.35:pMin(),1.3);}lastMX=e.clientX;lastMY=e.clientY;}});
 addEventListener('wheel',e=>{if(state!=='play'||uiOpen())return;camDist=clamp(camDist+e.deltaY*.01,4,P.inside?8:(P.mode==='balloon'||P.mode==='travel'?60:P.mode==='ship'?48:32));},{passive:true});
 $('bLock').onclick=()=>{setMlock(!mlock);};$('mini').style.cursor='pointer';$('mini').onclick=()=>{if(state==='play'&&!uiOpen())openMap();};$('bFP').onclick=()=>toggleFP();$('bAdmin').onclick=()=>openAdmin();
 if(hasTouch){
@@ -2647,7 +2651,7 @@ function fire(){
   if(P.inside&&(P.inside.room===ROOMS.cavern||P.inside.room===ROOMS.grotto||P.inside.room===ROOMS.lcc)){toast('League law: no muskets in Glimmerdeep.');P.reload=1;return;}
   
  const WPN=curWeapon();P.reload=(1-.1*(P.gunUp||0))*WPN.rel*Math.max(1.2,2.5-(P.army>=0?P.rank*.11:0)-(P.ruler>=0?.6:0));P.aimT=1.4;P.yaw=Math.atan2(-Math.sin(camYaw),-Math.cos(camYaw));P.vis.g.rotation.y=P.yaw;setAim(P.vis,true);P.vis.g.updateMatrixWorld(true);
- const o=camera.position.clone(),d=new V3();camera.getWorldDirection(d);if(OLY.shoot)olyShot(o,d.clone());const spr=Math.max(.003,.011-(P.army>=0?P.rank*.0009:0))*WPN.spr*(1-skillLv('marksman')*.04)*(1-.15*(P.gunUp||0));d.x+=(rr()-.5)*spr*2;d.y+=(rr()-.5)*spr*2;d.z+=(rr()-.5)*spr*2;d.normalize();
+ const o=camera.position.clone(),d=new V3();camera.getWorldDirection(d);if(OLY.shoot)olyShot(o,d.clone());const spr=Math.max(.003,.011-(P.army>=0?P.rank*.0009:0))*WPN.spr*(1-skillLv('marksman')*.04)*(1-.15*(P.gunUp||0))*(P.scope?.12:WPN.scope?3:1);   // a sniper rifle is wild from the hip and dead steady through the scoped.x+=(rr()-.5)*spr*2;d.y+=(rr()-.5)*spr*2;d.z+=(rr()-.5)*spr*2;d.normalize();
  const RNG=WPN.rng;let maxT=RNG;for(let t=2;t<RNG;t+=1.5){const px=o.x+d.x*t,py=o.y+d.y*t,pz=o.z+d.z*t;if(py<heightAt(px,pz)){maxT=t;break;}}
  if(SHOOT&&TARGETS.length&&shootingHit(o,d,maxT))return;
  let best=null,bt=maxT;for(const n of NPCS){if(n.dead||!n.g.visible)continue;const cx=n.pos.x-o.x,cy=n.pos.y+1.05-o.y,cz=n.pos.z-o.z;const t=cx*d.x+cy*d.y+cz*d.z;if(t<(fpOn()?.4:camDist*.6)||t>bt)continue;const qx=cx-d.x*t,qy=cy-d.y*t,qz=cz-d.z*t;if(qx*qx+qz*qz<.36&&Math.abs(qy)<1.05){best=n;bt=t;}}
@@ -2670,7 +2674,7 @@ function npcFire(n,d){n.vis.g.updateMatrixWorld(true);const mz=muzzleOf(n.vis);
  const chance=clamp(.5*(1-d/65),.08,.5);const tgt=P.pos.clone().add(new V3(0,1.1,0));
  if(rr()<chance){tracer(mz,tgt);hurtPlayer(9+rr()*7);}else{tgt.x+=(rr()-.5)*3;tgt.y+=(rr()-.5)*2;tgt.z+=(rr()-.5)*3;tracer(mz,tgt);}}
 function hurtPlayer(d){if(P.mode==='dead'||P.god)return;if(P.bless.resolve>0)d*=.6;d*=1-armourCut();P.hp-=d;$('hurt').style.boxShadow='inset 0 0 170px rgba(170,20,10,.75)';setTimeout(()=>{$('hurt').style.boxShadow='inset 0 0 160px rgba(170,20,10,0)';},180);P.hurtT=6;if(P.hp<=0)playerDie();}
-function playerDie(){P.hp=0;P.mode='dead';if(P.heat&&P.heat.some(v=>v>0)){P.heat=[0,0,0,0];setTimeout(()=>toast('The state lets the matter rest. Your wanted stars are gone.'),2500);}const lost=Math.floor(P.gold*.15);P.gold-=lost;let lc=0;for(const g in P.cargo){const l=Math.ceil(P.cargo[g]/2);P.cargo[g]-=l;lc+=l;if(!P.cargo[g])delete P.cargo[g];}
+function playerDie(){P.hp=0;P.mode='dead';scopeOff();if(P.heat&&P.heat.some(v=>v>0)){P.heat=[0,0,0,0];setTimeout(()=>toast('The state lets the matter rest. Your wanted stars are gone.'),2500);}const lost=Math.floor(P.gold*.15);P.gold-=lost;let lc=0;for(const g in P.cargo){const l=Math.ceil(P.cargo[g]/2);P.cargo[g]-=l;lc+=l;if(!P.cargo[g])delete P.cargo[g];}
  $('dtext').textContent=`You lost ${lost} gold${lc?` and ${lc} crates of cargo`:''}. A kindly mouse carried you to safety.`;$('death').classList.remove('hidden');releaseMouse();P.vis.g.rotation.x=-PI/2;}
 function respawn(){$('death').classList.add('hidden');let t=null;
  if(P.army>=0)t=capitalOf(P.army);else{let bd=1e9;for(const tt of TOWNS){if(!tt.inn)continue;const d=Math.hypot(tt.x-P.pos.x,tt.z-P.pos.z);if(d<bd){bd=d;t=tt;}}}
@@ -5242,7 +5246,7 @@ function adventureNear(){for(const Z of ZIPS)if(Math.hypot(P.pos.x-Z.a.x,P.pos.z
 
 // ================= WEAPONS AND ARMOUR =================
 const WEAPONS={musket:{id:'musket',n:'Service carbine',rel:.85,spr:.8,rng:200,dmg:1},rifle:{id:'rifle',n:'Bolt-action rifle',rel:1.05,spr:.4,rng:280,dmg:1.12},pistol:{id:'pistol',n:'Service revolver',rel:.38,spr:1.5,rng:80,dmg:.75},blunderbuss:{id:'blunderbuss',n:'Trench shotgun',rel:1.15,spr:2.8,rng:50,dmg:1.3},
- storm:{id:'storm',n:'Storm carbine',corps:'storm',rel:.55,spr:.7,rng:210,dmg:1.05},marksman:{id:'marksman',n:'Scoped marksman rifle',corps:'ranger',rel:1.25,spr:.12,rng:380,dmg:1.55},tankgun:{id:'tankgun',n:'Anti-tank rifle',corps:'heavy',rel:2.3,spr:.3,rng:330,dmg:2.6},autopistol:{id:'autopistol',n:'Aviator’s automatic pistol',corps:'aviator',rel:.22,spr:1.3,rng:90,dmg:.72},trenchgun:{id:'trenchgun',n:'Pump trench gun with bayonet',corps:'raider',rel:.8,spr:2.3,rng:55,dmg:1.6},semiauto:{id:'semiauto',n:'Self-loading rifle',corps:'gas',rel:.45,spr:.45,rng:250,dmg:1.05},flamer:{id:'flamer',n:'Flamethrower',corps:'flamer',rel:.13,spr:1.6,rng:24,dmg:.6,flame:true},cavcarbine:{id:'cavcarbine',n:'Cavalry carbine',corps:'cuirassier',rel:.7,spr:.7,rng:180,dmg:1.05}};
+ storm:{id:'storm',n:'Storm carbine',corps:'storm',rel:.55,spr:.7,rng:210,dmg:1.05},marksman:{id:'marksman',n:'Scoped marksman rifle',corps:'ranger',rel:1.25,spr:.12,rng:380,dmg:1.55},tankgun:{id:'tankgun',n:'Anti-tank rifle',corps:'heavy',rel:2.3,spr:.3,rng:330,dmg:2.6},autopistol:{id:'autopistol',n:'Aviator’s automatic pistol',corps:'aviator',rel:.22,spr:1.3,rng:90,dmg:.72},trenchgun:{id:'trenchgun',n:'Pump trench gun with bayonet',corps:'raider',rel:.8,spr:2.3,rng:55,dmg:1.6},semiauto:{id:'semiauto',n:'Self-loading rifle',corps:'gas',rel:.45,spr:.45,rng:250,dmg:1.05},flamer:{id:'flamer',n:'Flamethrower',corps:'flamer',rel:.13,spr:1.6,rng:24,dmg:.6,flame:true},sniper:{id:'sniper',n:'Scoped sniper rifle (Z for the scope)',corps:'sniper',rel:1.7,spr:.06,rng:650,dmg:2.3,scope:true},cavcarbine:{id:'cavcarbine',n:'Cavalry carbine',corps:'cuirassier',rel:.7,spr:.7,rng:180,dmg:1.05}};
 function ownedWeapons(){const o=[];if(P.army>=0&&CORPS[corpsNow()].gun)o.push(CORPS[corpsNow()].gun);if(P.items.musket||P.army>=0)o.push('musket');if(P.items.rifle)o.push('rifle');if(P.items.pistol)o.push('pistol');if(P.items.blunderbuss)o.push('blunderbuss');return o;}
 function curWeapon(){const o=ownedWeapons();if(!P.weapon||!o.includes(P.weapon))P.weapon=(P.army>=0&&CORPS[corpsNow()].gun&&o.includes(CORPS[corpsNow()].gun))?CORPS[corpsNow()].gun:o.includes('rifle')?'rifle':o[0]||'musket';return WEAPONS[P.weapon];}
 function cycleWeapon(){const o=ownedWeapons();if(o.length<2){toast(o.length?`You only carry a ${WEAPONS[o[0]].n.toLowerCase()}.`:'You carry no firearms.');return;}const i=o.indexOf(curWeapon().id);P.weapon=o[(i+1)%o.length];outfit();toast(`You ready your ${WEAPONS[P.weapon].n.toLowerCase()}.`);}
@@ -5970,6 +5974,13 @@ function heatTick(dt){if(!P.heat||state!=='play')return;HEATT-=dt;HUNTT-=dt;P.he
 function wantedHud(force){let d=document.getElementById('wantedHud');const w=P.heat||[0,0,0,0];const ks=[0,1,2,3].filter(k=>w[k]>0);
  if(!d){if(!ks.length)return;d=document.createElement('div');d.id='wantedHud';d.style.cssText='position:fixed;top:58px;right:14px;z-index:30;font:600 15px system-ui;color:#ffd34a;text-shadow:0 1px 3px #000,0 0 6px #000;text-align:right;pointer-events:none;line-height:1.5';document.body.appendChild(d);}
  d.innerHTML=ks.map(k=>`<div>${'★'.repeat(w[k])}<span style="opacity:.35">${'★'.repeat(5-w[k])}</span> ${esc(K[k].name)}</div>`).join('');d.style.display=ks.length&&state==='play'?'':'none';}
+
+// ================= THE SNIPER'S SCOPE =================
+function scopeOverlay(on){let d=document.getElementById('scopeOv');if(!d){d=document.createElement('div');d.id='scopeOv';d.style.cssText='position:fixed;inset:0;z-index:25;pointer-events:none;display:none;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 37vmin,rgba(0,0,0,.55) 37.4vmin,#000 38.5vmin)';
+  d.innerHTML='<div style="position:absolute;left:50%;top:50%;width:76vmin;height:76vmin;transform:translate(-50%,-50%);border-radius:50%;box-shadow:inset 0 0 6vmin rgba(0,0,0,.6)"></div><div style="position:absolute;left:50%;top:calc(50% - 37vmin);width:2px;height:74vmin;margin-left:-1px;background:linear-gradient(#000 0 34%,transparent 34% 66%,#000 66%)"></div><div style="position:absolute;top:50%;left:calc(50% - 37vmin);height:2px;width:74vmin;margin-top:-1px;background:linear-gradient(90deg,#000 0 34%,transparent 34% 66%,#000 66%)"></div><div style="position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#c22"></div><div style="position:absolute;left:50%;top:50%;width:24vmin;height:1px;margin-left:-12vmin;background:rgba(0,0,0,.7)"></div><div style="position:absolute;left:50%;top:50%;height:24vmin;width:1px;margin-top:-12vmin;background:rgba(0,0,0,.7)"></div>';document.body.appendChild(d);}
+ d.style.display=on?'':'none';}
+function toggleScope(){if(P.scope){scopeOff();return;}if(P.mode!=='walk')return;P.scope=true;P.scopeFP=!fpMode;if(!fpMode){fpMode=true;const b=$('bFP');if(b)b.classList.add('on');}scopeOverlay(true);}
+function scopeOff(){if(!P.scope)return;P.scope=false;scopeOverlay(false);if(P.scopeFP){fpMode=false;const b=$('bFP');if(b)b.classList.remove('on');P.vis.g.visible=true;if(VM)VM.g.visible=false;camPitch=clamp(camPitch,-.6,1.25);}P.scopeFP=false;}
 // ================= THE ASSEMBLY OF CROWNS: WINGS =================
 function backSpot(R0,x,z,yaw,key,lab){R0.arrive={x,z,yaw};R0.entry={x,z};R0.exit={x:x,z:z-9999};R0.spots.push({x,z:z+(yaw===PI?1.8:-1.8),label:lab||'Return to the Assembly chamber',type:'goroom',key:key||'assembly'});}
 const MFAV=[0,0,0,0];
@@ -6762,13 +6773,13 @@ function buildVM(coat,trim){if(!camera.parent)scene.add(camera);if(VM)camera.rem
  av.tube([new V3(-.02,-.07,-.42),new V3(-.3,-.42,.05)],[.075,.1],8,coat);av.add(GB.sph,'#e3a3a7',TM(-.01,-.05,-.45,.07,.065,.09),'#c4868b');
  const arms=new THREE.Mesh(av.geometry(),MOUSEMAT);gun.add(arms);arms.rotation.x=PI/2;
  g.visible=false;camera.add(g);VM={g,gun,kick:0,muzzle(){g.updateMatrixWorld(true);return gun.localToWorld(new V3(0,GUNMUZ[gty]||1.48,0));}};}
-function toggleFP(){fpMode=!fpMode;$('bFP').classList.toggle('on',fpMode);if(!fpMode){P.vis.g.visible=true;if(VM)VM.g.visible=false;camPitch=clamp(camPitch,-.6,1.25);}toast(fpMode?'First-person view. Press P to switch back.':'Third-person view.');}
+function toggleFP(){if(P.scope){const w=P.scopeFP;scopeOff();if(w)return;}fpMode=!fpMode;$('bFP').classList.toggle('on',fpMode);if(!fpMode){P.vis.g.visible=true;if(VM)VM.g.visible=false;camPitch=clamp(camPitch,-.6,1.25);}toast(fpMode?'First-person view. Press P to switch back.':'Third-person view.');}
 function updateCamera(dt){
  if(softLock&&!uiOpen()&&softMX>=0){const ew=innerWidth*.1,eh=innerHeight*.1;if(softMX<ew)camYaw+=dt*2.4*(1-softMX/ew);else if(softMX>innerWidth-ew)camYaw-=dt*2.4*(1-(innerWidth-softMX)/ew);if(softMY<eh)camPitch=clamp(camPitch-dt*1.4*(1-softMY/eh),pMin(),1.3);else if(softMY>innerHeight-eh)camPitch=clamp(camPitch+dt*1.4*(1-(innerHeight-softMY)/eh),pMin(),1.3);}
  if(fpOn()){camPitch=clamp(camPitch,-1.35,1.35);const v=P.vis,mv=P.fpBob||0;const eye=P.pos.clone();eye.y+=(P.mode==='swim'?.95:P.sit?1.55:1.72)+Math.abs(Math.sin(v.t))*.05*mv;eye.x+=Math.sin(P.yaw)*.2;eye.z+=Math.cos(P.yaw)*.2;
   const cp=Math.cos(camPitch);camera.position.copy(eye);camera.lookAt(eye.clone().add(new V3(-Math.sin(camYaw)*cp,-Math.sin(camPitch),-Math.cos(camYaw)*cp)));
-  const am=aimMode&&!!v.musket;aimZoom=lerp(aimZoom,am?1:0,Math.min(1,dt*9));const fov=(P.items.spyglass&&keys.KeyZ)?16:72-22*aimZoom;if(Math.abs(camera.fov-fov)>.01){camera.fov=fov;camera.updateProjectionMatrix();}
-  v.g.visible=false;if(VM){VM.g.visible=P.mode==='walk'&&!!v.musket&&!P.sit;VM.kick=Math.max(0,VM.kick-dt*5);const sw=Math.sin(v.t*.5)*.012*mv;
+  const am=aimMode&&!!v.musket;aimZoom=lerp(aimZoom,am?1:0,Math.min(1,dt*9));if(P.scope&&(!curWeapon().scope||P.mode!=='walk'))scopeOff();const fov=P.scope?8.5:(P.items.spyglass&&keys.KeyZ)?16:72-22*aimZoom;if(Math.abs(camera.fov-fov)>.01){camera.fov=fov;camera.updateProjectionMatrix();}
+  v.g.visible=false;if(VM){VM.g.visible=P.mode==='walk'&&!!v.musket&&!P.sit&&!P.scope;VM.kick=Math.max(0,VM.kick-dt*5);const sw=Math.sin(v.t*.5)*.012*mv;
    VM.gun.position.set(.24*(1-aimZoom*.98)+sw,-.25+aimZoom*.085+Math.abs(Math.sin(v.t))*.015*mv,-.32+VM.kick*.1);VM.gun.rotation.set(-PI/2+VM.kick*.3,.05*(1-aimZoom),0);}
   P.snapCam=false;return;}
  if(!P.vis.g.visible&&P.mode!=='dead')P.vis.g.visible=true;if(VM)VM.g.visible=false;camPitch=clamp(camPitch,-.6,1.3);

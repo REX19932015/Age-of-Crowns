@@ -778,6 +778,7 @@ const H = {
     toast(S, `${O.char.name} is now ${RANKS[r]}.`, 'gold');
     system('army', `${S.char.name} ${up ? 'promotes' : 'demotes'} ${O.char.name} to ${RANKS[r]}.`, X => X.mil && X.mil.army === O.mil.army);
   },
+  sproketAnswer(S, m) { return BOT.answer(S, m); },
   async armyCorps(S, m) {   // only a Lieutenant or higher (senior to the soldier), the Marshal, the Monarch or an admin assigns a division
     const O = byNid.get(m.nid); if (!O || !O.ready || !O.mil) return err(S, 'They are not a soldier.');
     const corps = CORPS[m.corps] ? m.corps : null; if (!corps) return err(S, 'No such division.');
@@ -1002,16 +1003,18 @@ attach(server, { maxPayload: 600 * 1024, verifyOrigin: originOk }, (ws, req) => 
     if (!m || typeof m.t !== 'string') return;
     busy = busy.then(async () => {
       try {
-        if (m.t === 'hello') return await onHello(S, m);
+        if (m.t === 'hello') return m.sproket ? await BOT.hello(S, m) : await onHello(S, m);
         if (m.t === 'create') return await onCreate(S, m);
         if (m.t === 'ping') return send(S, { t: 'pong', ts: m.ts });
-        if (!S.ready) return;
+        const T = S.link || S;   // a browser playing Sproket acts as Sproket
+        if (!T.ready) return;
         const h = Object.prototype.hasOwnProperty.call(H, m.t) ? H[m.t] : null;
-        if (h) await h(S, m);
+        if (h) await h(T, m);
       } catch (e) { log('handler error', m.t, e.stack || e.message); err(S, 'The server could not do that.'); }
     });
   });
   ws.on('close', () => {
+    BOT.closed(S);
     const p = busy.then(() => leaveWorld(S)).catch(() => {});
     if (S.id) { leaving.set(S.id, p); p.then(() => { if (leaving.get(S.id) === p) leaving.delete(S.id); }); }
     byNid.delete(S.nid);
@@ -1044,12 +1047,14 @@ const BOT = (() => {
     chat: { times: [], last: 0, lastText: '', lastAt: 0, strikes: 0, muteUntil: 0 }, mil: null, trade: null, admin: false,
     ws: { open: true, send(raw) { try { brainQ.push(JSON.parse(raw)); } catch (e) {} }, close() {} },
   };
-  const B = { mode: 'follow', target: null, goto: null, lastReal: 0, force: null, lastReply: 0, enteredAt: 0 };
-  const store = () => { const W = WORLD && WORLD.state; if (!W) return; W.bot = { army: S.mil ? S.mil.army : -1, rank: S.mil ? S.mil.rank : 0, corps: S.mil ? S.mil.corps : 'line', kingdom: S.char.kingdom, look: S.char.look }; };
+  const B = { mode: 'follow', target: null, goto: null, lastReal: 0, force: null, lastReply: 0, enteredAt: 0, puppet: null };
+  const fakeWs = S.ws, pending = new Map();
+  const store = () => { const W = WORLD && WORLD.state; if (!W || !S.char) return; W.bot = { army: S.mil ? S.mil.army : -1, rank: S.mil ? S.mil.rank : 0, corps: S.mil ? S.mil.corps : 'line', kingdom: S.char.kingdom, look: S.char.look, save: S.char.save && typeof S.char.save === 'object' ? S.char.save : null, keys: (W.bot && W.bot.keys) || [] }; };
   function makeChar() {
     const saved = (WORLD && WORLD.state && WORLD.state.bot) || {};
     const k = clampInt(saved.kingdom === undefined ? 1 : saved.kingdom, 0, 3);
-    S.char = { user_id: BOT_ID, name: BOT_NAME, kingdom: k, gold: 100, wallet_seq: 0, items: {}, cargo: {}, look: saved.look || { fur: '#a07850', coat: '#4f6b3a', trim: '#d9ccb0', pants: '#4a3f33' }, save: { name: BOT_NAME, home: k }, army: -1, army_rank: 0, gov_rank: 0, achievements: { medals: [] }, created_at: '2026-11-27T19:00:00.000Z' };
+    const look = saved.look || { fur: '#a07850', coat: '#4f6b3a', trim: '#d9ccb0', pants: '#4a3f33' };
+    S.char = { user_id: BOT_ID, name: BOT_NAME, kingdom: k, gold: 100, wallet_seq: 0, items: { tonic: 1, musket: true, backpack: false, lumen: false }, cargo: {}, look, save: saved.save || { name: BOT_NAME, home: k, fur: look.fur, look }, army: -1, army_rank: 0, gov_rank: 0, achievements: { medals: [] }, created_at: '2026-11-27T19:00:00.000Z' };
     const army = saved.army === undefined ? k : clampInt(saved.army, -1, 3);
     S.mil = army >= 0 ? { army, rank: clampInt(saved.rank === undefined ? 1 : saved.rank, 0, MAX_RANK), regiment_id: null, role: 'member', corps: CORPS[saved.corps] ? saved.corps : 'line', lastUp: now() } : null;
     S.char.army = army; S.char.army_rank = S.mil ? S.mil.rank : 0; S.vlook = lockLook(S, S.char.look);
@@ -1078,7 +1083,7 @@ const BOT = (() => {
     return best;
   }
   function step(dt) {
-    if (!S.ready) return;
+    if (!S.ready || B.puppet) return;
     const L = leader(); if (!L) return;
     if (!fin(S.x)) { S.x = L.x + 3; S.z = L.z + 3; S.y = L.y; S.inside = L.inside; S.moved = true; return; }
     let tx = S.x, tz = S.z, near = 0;
@@ -1141,13 +1146,60 @@ const BOT = (() => {
     if (c === 'join') { const W = WORLD.state; const R = W.regs.find(x => String(x.id) === rest || x.name.toLowerCase().includes(rest.toLowerCase())); if (!R) return err(A, 'No company matches that.'); WORLD.handlers.wcmd(S, { op: 'join', id: R.id }); return toast(A, `Sproket asks to join the ${R.name}.`); }
     if (c === 'leave') { WORLD.handlers.wcmd(S, { op: 'leave' }); return toast(A, 'Sproket leaves his company.'); }
     if (c === 'look') { try { const l = JSON.parse(rest); S.char.look = cleanLook(l); S.vlook = lockLook(S, S.char.look); announcePlayer(S); store(); return toast(A, 'Sproket changes his look.'); } catch (e) { return err(A, 'Usage: /sproket look {"coat":"#556b2f"}'); } }
-    if (c === 'status' || !c) { const mi = milInfo(S); return toast(A, `Sproket: ${mi ? mi.rankName + ', ' + CORPS[mi.corps] + ', ' + KNAMES[mi.army] + ' Army' : 'civilian'} · ${B.mode}${fin(S.x) ? ' · at ' + Math.round(S.x) + ', ' + Math.round(S.z) : ''}`); }
+    if (c === 'keys') { const W = WORLD.state; if (W.bot) W.bot.keys = []; if (B.puppet) { send(B.puppet, { t: 'kicked', msg: 'An admin signed this browser out of Sproket.' }); B.puppet.ws.close(4001, 'keys cleared'); } return toast(A, 'Every browser that could play Sproket has been signed out.'); }
+    if (c === 'status' || !c) { const mi = milInfo(S); return toast(A, `Sproket: ${mi ? mi.rankName + ', ' + CORPS[mi.corps] + ', ' + KNAMES[mi.army] + ' Army' : 'civilian'} · ${B.puppet ? 'played live' : B.mode}${fin(S.x) ? ' · at ' + Math.round(S.x) + ', ' + Math.round(S.z) : ''}`); }
     return err(A, 'Sproket commands: say/g/k/a/s/pm <text>, follow [name], stay, come, goto <x> <z>, emote <e>, join <company>, leave, look <json>, status, on, off. Ranks and divisions: use the admin list like any player.');
+  }
+  // ---- playing Sproket from a browser: an admin approves the browser once, and it keeps a key for next time
+  const crypto = require('crypto'), hash = k => crypto.createHash('sha256').update(String(k)).digest('hex');
+  const admins = () => [...online.values()].filter(O => O.ready && O.admin && !O.bot);
+  async function hello(C, m) {
+    if (C.link || C.id) return;
+    if (B.puppet && B.puppet.ws.open) { send(C, { t: 'auth', ok: false, msg: 'Sproket is already being played in another browser.' }); return C.ws.close(4002, 'busy'); }
+    const keys = (WORLD && WORLD.state && WORLD.state.bot && WORLD.state.bot.keys) || [];
+    if (typeof m.key === 'string' && m.key.length >= 32 && keys.includes(hash(m.key))) return take(C, null);
+    C.pairCode = String(1000 + crypto.randomInt(9000)); C.pairAt = now(); pending.set(C.nid, C);
+    const ad = admins();
+    send(C, { t: 'sproketWait', code: C.pairCode, admins: ad.length });
+    for (const A of ad) send(A, { t: 'sproketAsk', nid: C.nid, code: C.pairCode });
+    log(`a browser asks to play ${BOT_NAME} (code ${C.pairCode}); ${ad.length} admin(s) asked`);
+  }
+  function answer(A, m) {
+    if (!A.admin) return err(A, 'Only admins can let a browser play Sproket.');
+    const C = pending.get(clampInt(m.nid, 0, 1e9)); if (!C || !C.ws.open) return err(A, 'That request has expired.');
+    pending.delete(C.nid);
+    if (!m.ok) { send(C, { t: 'auth', ok: false, msg: 'An admin declined this browser.' }); C.ws.close(4003, 'declined'); return toast(A, 'Declined.'); }
+    for (const O of admins()) if (O !== A) send(O, { t: 'sproketAsked', nid: C.nid });
+    take(C, A); toast(A, `Approved. That browser now plays ${BOT_NAME}.`, 'gold');
+  }
+  function take(C, A) {
+    if (B.puppet && B.puppet !== C) closed(B.puppet);
+    pending.delete(C.nid);
+    if (!S.ready) enter();
+    B.puppet = C; C.link = S; S.ws = C.ws; S.seen = new Set(); S.chat.muteUntil = 0;
+    if (A) { const key = crypto.randomBytes(24).toString('hex'); const W = WORLD.state; store(); W.bot.keys = (W.bot.keys || []).concat(hash(key)).slice(-5); send(C, { t: 'sproketKey', key }); }
+    send(C, { t: 'auth', ok: true, id: BOT_ID, admin: false, needCharacter: false, kingdoms: KNAMES });
+    const c = S.char, k = c.kingdom, pol = polState(k); pol.myVotes = myVotes(S, k);
+    const save = overlayServerFields(c); if (fin(S.x)) { save.x = S.x; save.z = S.z; save.wsc = 1; }
+    send(C, { t: 'world', you: { nid: S.nid, id: BOT_ID, name: BOT_NAME, kingdom: k, admin: false, title: titleOf(S), bot: true }, save, wseq: c.wallet_seq, mil: milInfo(S), pol,
+      kingdoms: kingdoms.map(x => ({ id: x.id, name: x.name, treasury: x.treasury, tax: x.tax_rate })), props: [...properties.values()].map(p => ({ id: p.id, kind: p.kind, town: p.town, owner: nameOf(p.owner), mine: false })),
+      events: [...events.values()].map(evInfo), history: ['global', 'kingdom:' + k].concat(S.mil ? ['army:' + S.mil.army] : []).flatMap(ch => history.get(ch) || []).sort((a, b) => a.ts - b.ts).slice(-60), pms: [],
+      regiments: [...regiments.values()].filter(r => r.kingdom === (S.mil ? S.mil.army : k)).map(r => ({ id: r.id, name: r.name, commander: nameOf(r.commander) })) });
+    sendOffices(S); if (WORLD) WORLD.onEnter(S);
+    log(`${BOT_NAME} is now played from a browser${A ? ' (approved by ' + A.char.name + ')' : ' (saved key)'}`);
+    for (const O of admins()) toast(O, `${BOT_NAME} is now being played live.`);
+  }
+  function closed(C) {
+    pending.delete(C.nid);
+    if (B.puppet !== C) return;
+    B.puppet = null; C.link = null; S.ws = fakeWs; S.seen = new Set(); store(); B.mode = 'follow'; B.target = null;
+    log(`${BOT_NAME} is back on autopilot`);
   }
   let last = now();
   setInterval(() => {
     const t = now(), dt = Math.min(.5, (t - last) / 1000); last = t;
-    const n = real().length; if (n) B.lastReal = t;
+    const n = real().length + (B.puppet ? 1 : 0); if (n) B.lastReal = t;
+    for (const [nid, C] of pending) if (t - C.pairAt > 300000 || !C.ws.open) { pending.delete(nid); if (C.ws.open) { send(C, { t: 'auth', ok: false, msg: 'No admin approved this browser in time. Reload to ask again.' }); C.ws.close(4003, 'not approved'); } }
     if (n && !S.ready && B.force !== false) enter();
     if (B.force === false && !n) B.force = null;
     if (!n && S.ready && t - B.lastReal > 30000 && !B.force) leave();
@@ -1155,7 +1207,7 @@ const BOT = (() => {
     try { think(); step(dt); } catch (e) { log('sproket error', e.stack || e.message); }
   }, 100);
   setInterval(() => { if (S.ready) store(); }, 20000);
-  return { S, command, get on() { return S.ready; } };
+  return { S, command, hello, answer, closed, get on() { return S.ready; }, get live() { return !!B.puppet; } };
 })();
 
 let lastTick = now();

@@ -78,6 +78,8 @@ function lockLook(S, look) {
   const l = { ...(look || {}) }, c = corpsOf(S);
   if (l.corps !== undefined && l.corps !== c) delete l.corps;
   if (CORPS_HATS.has(l.hat) && (!c || CORPS_HAT[c] !== l.hat)) delete l.hat;
+  // the rank shown on a uniform is always the soldier's real rank
+  if (l.corps && S.mil) l.rk = String(S.mil.rank); else delete l.rk;
   return l;
 }
 const ESTATE_PRICE = 2500, ESTATES_PER_TOWN = 4, REGIMENT_PRICE = 200, MAX_HOUSES = 10;
@@ -202,7 +204,7 @@ function cleanBag(o, maxKeys = 200) {
   }
   return out;
 }
-const LOOK_KEYS = ['fur', 'coat', 'trim', 'pants', 'hat', 'hatCol', 'size', 'civvies', 'dress', 'royal', 'epaulettes', 'apron', 'crossbelt', 'cape', 'ruler', 'sash', 'cuirass', 'officer', 'musket', 'gun', 'queen', 'corps', 'scarf', 'bag', 'glasses', 'feather', 'earring'];
+const LOOK_KEYS = ['fur', 'coat', 'trim', 'pants', 'hat', 'hatCol', 'size', 'civvies', 'dress', 'royal', 'epaulettes', 'apron', 'crossbelt', 'cape', 'ruler', 'sash', 'cuirass', 'officer', 'musket', 'gun', 'queen', 'corps', 'scarf', 'bag', 'glasses', 'feather', 'earring', 'rk'];
 function cleanLook(o) {
   const out = {};
   if (!o || typeof o !== 'object') return out;

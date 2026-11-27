@@ -394,7 +394,7 @@ const RANKS=[{n:'Recruit',m:0},{n:'Private',m:3},{n:'Lance Corporal',m:8},{n:'Co
 // merit carries a soldier up to Warrant Officer; every rank above it is granted by an admin
 const WARRANT_R=6,OFFICER_R=7,COLONEL_R=10;
 // specialised corps: their helmet, gear and the perk weapon each one carries
-const CORPS={line:{n:'Line Infantry',hat:'stahlhelm',gun:null,arm:0},storm:{n:'Storm Troopers',hat:'stahlhelm',gun:'storm',arm:0},heavy:{n:'Heavy Infantry',hat:'heavyhelm',gun:'tankgun',arm:.25},sniper:{n:'Snipers',hat:'ghillie',gun:'sniper',arm:0},raider:{n:'Trench Raiders',hat:'raiderhelm',gun:'trenchgun',arm:.1},gas:{n:'Gas Sentinels',hat:'gashelm',gun:'semiauto',arm:.05},flamer:{n:'Flame Pioneers',hat:'flamehelm',gun:'flamer',arm:.15},ranger:{n:'Frost Rangers',hat:'snowhood',gun:'marksman',arm:0},aviator:{n:'Sky Corps',hat:'flycap',gun:'autopistol',arm:0},cuirassier:{n:'Royal Cuirassiers',hat:'cuirhelm',gun:'cavcarbine',arm:.3}};
+const CORPS={line:{n:'Line Infantry',hat:'stahlhelm',gun:null,arm:0},storm:{n:'Storm Troopers',hat:'stahlhelm',gun:'storm',arm:0},heavy:{n:'Heavy Infantry',hat:'heavyhelm',gun:'tankgun',arm:.25},sniper:{n:'Snipers',hat:'ghillie',gun:'sniper',arm:0}};
 const corpsNow=()=>CORPS[P.corps]?P.corps:'line';
 const FIRST=['Pip','Bramble','Clover','Hazel','Barnaby','Thistle','Juniper','Wren','Fennel','Maple','Tobias','Mirabel','Rowan','Basil','Sorrel','Ember','Quill','Nutmeg','Percival','Tansy','Oswin','Marigold','Cedric','Poppy','Alder','Linden','Sage','Bryony','Corwin','Elspeth','Hob','Greta'];
 const LAST=['Whiskerton','Cheddarby','Longtail','Nibbleworth','Crumbsworth','Squeakley','Brambletail','Seedwhistle','Furrowby','Quickpaw','Greyfur','Copperwhisk','Holloway','Thimble','Acornfield','Pockettail'];
@@ -1580,11 +1580,11 @@ const MOUSE_SDF={"v": 6970, "t": 14000, "i32": false, "pos": "gQeCIvTAGwfdIgDB0Q
 function skinMat(m,o){// a skinned body needs a skinning copy of any material put on it
  if(!o.isSkinnedMesh)return m;if(!m._sk){m._sk=m.clone();m._sk.skinning=true;}return m._sk;}
 const _muBase={},_muGeo=new Map();
-const SLEEKU=new Set(['line','sniper','storm','heavy','raider','gas','flamer','ranger','aviator','cuirassier']);
+const SLEEKU=new Set(['sniper']);
 function unitOf(o){// soldiers wear a studio unit morph (Regiments, Great War Corps) from js/morphs.js: one seamless uniform + helmet + gear, skinned like the body; regions 1 uniform, 2 facings, 3 breeches take kingdom colours
 const M=window.MORPHS||{};let u=null;
- if(o.corps)u=SLEEKU.has(o.corps)?o.corps:'line';
- else if(o.crossbelt)u='line';   // every soldier with a musket wears the new line kit
+ if(o.corps)u={line:'line',storm:'stormtrooper',heavy:'sapper',sniper:'sniper'}[o.corps]||'line';
+ else if(o.crossbelt)u=(o.hat==='furcap'||o.hat==='shako')?'grenadier':o.hat==='tricorn'?'musketeer':'regiment';
  else if(o.epaulettes)u='officercoat';   // officers: the regimental coat without crossbelts, under their own hat
  else if(o.coat)u=o.apron?'civapron':(o.hat==='cap'||o.hat==='bandana'||o.hat==='wide')?'civtunic':'civcoat';   // everyone else wears everyday clothes: a work tunic or a town coat
  return u&&M[u]?u:null;}
@@ -1666,7 +1666,7 @@ function makeMouse(o){
   // the head, snout, nose, teeth and ears are one seamless surface (see mouseSkinGeo); whiskers and hats are added here
   for(const s of[-1,1]){const em=TM(s*.24,.28,-.08,1,1,1,-.2,s*.45,-s*.5);
   // long fine whiskers in two segments, plus brow whiskers
-   if(U==='ironmask'||U==='raider'||U==='gas'||U==='flamer'||U==='heavy'||U==='sniper')continue;   // a mask, wrap or jaw guard hides the whiskers
+   if(U==='ironmask'||U==='sniper')continue;   // a closed helm or a ghillie hood hides the whiskers
    if(o.hat==='ironmask'){v.add(GB.torus,'#2c2d2a',em.clone().multiply(TM(0,-.27,0,.11,.11,.16,PI/2,0,0)));continue;}   // the helm hides the whiskers; a ring seals each ear
    for(let k=0;k<6;k++){const yy=-.06+(k%3-1)*.022,zz=.5-Math.floor(k/3)*.035;const ry=-s*(.05+k*.07),rz=s*((k%3)-1)*.14;v.add(GB.boxc,'#f4f0e8',TM(s*.2,yy,zz-.06,.34,.0045,.0045,0,ry,rz));v.add(GB.boxc,'#e6e0d4',TM(s*.42,yy+((k%3)-1)*.02,zz-.17,.2,.0035,.0035,0,ry*1.6,rz*1.4));}
    v.add(GB.boxc,'#efe9df',TM(s*.17,.16,.22,.2,.0035,.0035,0,-s*.4,s*.35));}
@@ -5514,14 +5514,12 @@ const FIELD={foot:{n:3,size:20},horse:{n:2,size:12},guns:{n:2,size:6}};
 const RES=[0,1,2,3].map(()=>({foot:0,horse:0,guns:0}));
 const DIVS={
  foot:{line:{n:'Line Infantry',d:'Steady ranks and disciplined volleys.',atk:1,def:1,spd:1,gap:2.3},
-  storm:{n:'Shock Troopers',d:'Lead the assault: they rush the enemy and fight hand to hand.',atk:1.3,def:.85,spd:1.2,gap:2.1,melee:1},
+  storm:{n:'Shock Troopers',d:'Storm Troopers who lead the assault: they rush the enemy and fight hand to hand.',atk:1.3,def:.85,spd:1.2,gap:2.1,melee:1},
   heavy:{n:'Heavy Infantry',d:'Armoured breakthrough troops: hard to hurt and hard to break, but slow.',atk:1.1,def:1.3,spd:.85,gap:2.4,hp:1.4},
   sniper:{n:'Snipers',d:'Ghillie-suited marksmen in loose order: deadly accurate from far away, fragile up close.',atk:1.25,def:.8,spd:.95,gap:5,acc:2.2},
-  raider:{n:'Trench Raiders',d:'Night fighters who close fast and finish it with clubs and bayonets.',atk:1.2,def:.9,spd:1.3,gap:2.6,melee:1},
-  gas:{n:'Gas Sentinels',d:'Masked veterans who hold their ground through anything.',atk:1.1,def:1.15,spd:1,gap:2.2,mor:1.7},
-  flamer:{n:'Flame Pioneers',d:'Assault engineers whose fire breaks defenders: brutal up close, short-ranged.',atk:1.45,def:1.05,spd:.95,gap:2.4,melee:1},
-  ranger:{n:'Frost Rangers',d:'Scouts in loose order: quick on their feet and accurate.',atk:1.05,def:.9,spd:1.3,gap:4.2,acc:1.4},
-  aviator:{n:'Sky Corps',d:'Light, fast troops who strike where they are least expected.',atk:.95,def:.85,spd:1.45,gap:3.4,acc:1.1}},
+  light:{n:'Light infantry',d:'Skirmishers in loose order: quick and accurate.',atk:1.05,def:.9,spd:1.3,gap:4.2,acc:1.35},
+  grenadier:{n:'Grenadiers',d:'Big, tough and hard to break. They stand firm against cavalry.',atk:1.1,def:1.25,spd:.9,gap:2.4,hp:1.35},
+  guard:{n:'Royal Guard',d:'Elite veterans who almost never break.',atk:1.15,def:1.15,spd:1,gap:2.2,mor:1.7}},
  horse:{hussar:{n:'Hussars',d:'Light, fast riders who harass and chase.',atk:1,def:.9,spd:1.3,gap:3.4,melee:1},
   dragoon:{n:'Dragoons',d:'Ride up, fire their carbines, then charge with the sabre.',atk:1.05,def:1,spd:1.1,gap:3.4,melee:1,gun:1},
   cuirassier:{n:'Cuirassiers',d:'Armoured heavy cavalry that smash through lines.',atk:1.35,def:1.25,spd:.9,gap:3.6,melee:1,hp:1.4}},
@@ -5533,7 +5531,7 @@ const CFORMS={line:'Line',column:'Column',square:'Square',skirmish:'Open order'}
 const STANCES={attack:'Attack on sight',defend:'Hold ground and return fire',hold:'Hold fire'};
 const COMPNAME={foot:'Company',horse:'Troop',guns:'Battery'};
 const regTy=R=>R.type||'foot';
-const DIVMAP={shock:'storm',grenadier:'heavy',light:'ranger',guard:'gas'};const divOf=R=>{if(DIVMAP[R.div]&&regTy(R)==='foot')R.div=DIVMAP[R.div];return DIVS[regTy(R)][R.div]||DIVS[regTy(R)][DIV0[regTy(R)]];};
+const DIVMAP={shock:'storm',raider:'light',gas:'guard',flamer:'storm',ranger:'light',aviator:'light'};const divOf=R=>{if(DIVMAP[R.div]&&regTy(R)==='foot')R.div=DIVMAP[R.div];return DIVS[regTy(R)][R.div]||DIVS[regTy(R)][DIV0[regTy(R)]];};
 const compSize=R=>FIELD[regTy(R)].size;
 
 // ---- who may command: Lieutenant 1 company, Captain 2, Major 4, Colonel every company and recruiting, General (and rulers, admin) everything
@@ -5576,10 +5574,10 @@ function gunSpot(R,g){const D=divOf(R);const n=Math.max(1,R.sol?R.sol.length:R.s
 
 // ---- bringing a company to life near the player, and putting it away again
 const MATR=190,DEMATR=240,MATCAP=150;
-function soldierLook(R,i){const ty=regTy(R),kk=K[R.k],off=i===0;const o={coat:kk.coat,trim:kk.trim,hat:'stahlhelm',pants:shadeHex(kk.coat,.72),musket:true,epaulettes:off,officer:off};
- if(ty==='foot'){divOf(R);o.corps=SLEEKU.has(R.div)?R.div:'line';}
- else if(ty==='horse'){o.corps='cuirassier';o.musket=off;}
- else{o.corps='heavy';o.musket=off;}
+function soldierLook(R,i){if(regTy(R)==='foot'){divOf(R);if(R.div==='storm'||R.div==='heavy'||R.div==='sniper'){const kk=K[R.k],off=i===0;return{coat:kk.coat,trim:kk.trim,hat:CORPS[R.div].hat,pants:shadeHex(kk.coat,.72),corps:R.div,musket:true,epaulettes:off,officer:off};}}const ty=regTy(R),kk=K[R.k],off=i===0;const o={coat:kk.coat,trim:kk.trim,hat:kk.hat,pants:'#e9e2d2',crossbelt:!off,epaulettes:off,officer:off,musket:true};
+ if(ty==='foot'){if(R.div==='grenadier')o.hat='furcap';else if(R.div==='light')o.hat='tricorn';else if(R.div==='guard'){o.hat='shako';o.sash=kk.trim;}else if(R.div==='shock'&&!off){o.corps='storm';}}
+ else if(ty==='horse'){o.coat=shadeHex(kk.coat,.85);if(R.div==='hussar'){o.hat='shako';o.sash='#d9b24a';o.musket=off;}else if(R.div==='cuirassier'){o.cuirass=true;o.hat='stahlhelm';o.musket=off;}else{o.hat='tricorn';}}
+ else{if(!off){o.corps='heavy';o.musket=false;o.crossbelt=false;}}
  return o;}
 function regSpawn(R,i,fromHome){const D=divOf(R);const s=regSlot(R,i);let x=s.x,z=s.z;if(fromHome){const t=TOWNS[R.home]||capitalOf(R.k);const a=rr()*TAU;x=t.x+Math.cos(a)*t.r*.5;z=t.z+Math.sin(a)*t.r*.5;}
  const L=soldierLook(R,i);const off=i===0&&R.cmd;

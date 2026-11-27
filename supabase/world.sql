@@ -12,3 +12,5 @@ create table if not exists public.world_state (
 );
 alter table public.world_state enable row level security;
 -- no policies: browsers cannot read or write this table; the server uses its service key.
+grant select, insert, update, delete on public.world_state to service_role;
+notify pgrst, 'reload schema';

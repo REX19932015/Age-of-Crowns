@@ -13,7 +13,7 @@
   WORLD_SEED (Natan by default).
 */
 module.exports = function makeWorld(ctx) {
-  const { db, log, each, send, err, toast, online, offices, nameOf, TOWNS, KNAMES, RANKS, changeGold } = ctx;
+  const { db, log, each, send, err, toast, online, offices, nameOf, TOWNS, KNAMES, RANKS, changeGold, byNid, CORPS, system } = ctx;
   const DAYLEN = 720;                     // real seconds in a game day, as in the browser
   const SEED = (process.env.WORLD_SEED || 'Natan').toLowerCase();
   const rr = Math.random, pick = a => a[Math.floor(rr() * a.length)];
@@ -289,7 +289,7 @@ module.exports = function makeWorld(ctx) {
   function stateMsg() { return { t: 'wstate', w: { t: W.t, rel: W.rel, war: W.war, ally: W.ally, ws: W.ws, news: W.news, ai: W.ai.map(a => ({ pers: a.pers, mil: a.mil, stab: a.stab, goal: a.goal, grudge: a.grudge, trust: a.trust })), gov: W.gov, treaties: W.treaties, occ: W.occ, ruin: W.ruin, rebel: W.rebel, rulers: R4().map(rulerOf), forts: W.forts, res: W.res, auto: W.auto } }; }
   function broadcastState() { const m = stateMsg(); each(S => send(S, m)); }
   function regsMsg() { return { t: 'wregs', t0: W.t, regs: W.regs.map(regView) }; }
-  let syncT = 0, aiT = 0, secT = 0, stateT = 0;
+  let syncT = 0, aiT = 0, secT = 0, stateT = 0, rosT = 0;
   function tick(dt) {
     if (!W) return; W.t += dt / DAYLEN; const day = Math.floor(W.t);
     if (day > lastDay) { lastDay = day; try { newDay(); } catch (e) { log('world day error', e.stack || e.message); } }
@@ -298,6 +298,7 @@ module.exports = function makeWorld(ctx) {
     aiT += dt; if (aiT >= 15) { aiT = 0; for (let k = 0; k < 4; k++) if (W.auto[k]) regAI(k); }
     syncT += dt; if (syncT >= 1) { syncT = 0; const m = regsMsg(); each(S => send(S, m)); if (pending.length) { const n = { t: 'wnews', items: pending.splice(0) }; each(S => send(S, n)); } }
     stateT += dt; if (stateT >= 20 || (dirty && stateT >= 3)) { stateT = 0; broadcastState(); }
+    rosT += dt; if (rosT >= 1) { rosT = 0; milTick(); }
     if (Date.now() - lastSave > 60000) save();
   }
   async function save() {
@@ -317,6 +318,7 @@ module.exports = function makeWorld(ctx) {
       regId = W.regs.reduce((a, r) => Math.max(a, r.id), 0); reorg(); await save();
     }
     regId = W.regs.reduce((a, r) => Math.max(a, r.id), 0); reorg(); lastDay = Math.floor(W.t);
+    milInit();
   }
 
   // ---------------------------------------------------------------- requests from players, checked here
@@ -360,9 +362,106 @@ module.exports = function makeWorld(ctx) {
     else return;
     dirty = true; broadcastState();
   }
+
+  // ---------------------------------------------------------------- the chain of command: real soldiers in companies and squads
+  // W.mem: user id -> { co: company id, n: name, r: rank, c: division }   (saved with the world)
+  // W.sq:  [{ id, co, k, name, lead: user id or null, by: user id, mem: [user ids] }]
+  const LT = RANKS.indexOf('Lieutenant'), SQ_MAX = 10, SQ_PER_CO = 8;
+  let rosterDirty = true;
+  const sqInv = new Map();   // user id -> { sq, from, until }
+  function milInit() { W.mem = (W.mem && typeof W.mem === 'object') ? W.mem : {}; W.sq = Array.isArray(W.sq) ? W.sq : []; W.sqId = W.sqId || W.sq.reduce((a, q) => Math.max(a, q.id), 0); rosterDirty = true; }
+  const coOf = id => W.regs.find(r => r.id === id);
+  const sqOfUid = uid => W.sq.find(q => q.mem.includes(uid));
+  const isOfficer = (S, k) => !!(S.admin || (offices[k] && (offices[k].monarch === S.id || offices[k].marshal === S.id)) || (S.mil && S.mil.army === k && S.mil.rank >= LT));
+  const canManage = (S, q) => !!(q && (S.admin || q.lead === S.id || q.by === S.id || isOfficer(S, q.k)));
+  const snap = S => ({ n: S.char.name, r: S.mil ? S.mil.rank : 0, c: S.mil && CORPS[S.mil.corps] ? S.mil.corps : 'line' });
+  function unSquad(uid) { const q = sqOfUid(uid); if (!q) return null; q.mem = q.mem.filter(u => u !== uid); if (q.lead === uid) q.lead = null; return q; }
+  function dropMember(uid) { if (!W) return; const had = !!W.mem[uid] || !!sqOfUid(uid); unSquad(uid); delete W.mem[uid]; if (had) { dirty = true; rosterDirty = true; } }
+  function setCompany(S, R) { const cur = W.mem[S.id]; if (cur && cur.co !== R.id) { const q = sqOfUid(S.id); if (q && q.co !== R.id) unSquad(S.id); } W.mem[S.id] = { co: R.id, ...snap(S) }; dirty = true; rosterDirty = true; }
+  function refresh(S) {   // a soldier's name, rank or division changed, or they came online
+    if (!W || !S || !S.char) return; const m = W.mem[S.id];
+    if (m) { const R = coOf(m.co); if (!S.mil || !R || R.k !== S.mil.army) return dropMember(S.id); Object.assign(m, snap(S)); }
+    else if (sqOfUid(S.id)) unSquad(S.id);
+    rosterDirty = true;
+  }
+  function milTick() {
+    // companies that were destroyed take their roster and squads with them
+    let ch = false;
+    for (const [uid, m] of Object.entries(W.mem)) if (!coOf(m.co)) { delete W.mem[uid]; ch = true; }
+    const before = W.sq.length; W.sq = W.sq.filter(q => coOf(q.co)); for (const q of W.sq) { const keep = q.mem.filter(u => W.mem[u] && W.mem[u].co === q.co); if (keep.length !== q.mem.length) { q.mem = keep; ch = true; } if (q.lead && !q.mem.includes(q.lead)) { q.lead = null; ch = true; } }
+    if (ch || W.sq.length !== before) { dirty = true; rosterDirty = true; }
+    for (const [uid, v] of sqInv) if (v.until < Date.now()) sqInv.delete(uid);
+    if (rosterDirty) { rosterDirty = false; each(S => send(S, rosterMsg(S))); }
+  }
+  function rosterMsg(S) {
+    const cos = {};
+    for (const [uid, m] of Object.entries(W.mem)) { const q = sqOfUid(uid); (cos[m.co] = cos[m.co] || []).push([m.n, m.r, m.c, q ? q.id : 0, online.has(uid) ? 1 : 0, q && q.lead === uid ? 1 : 0]); }
+    for (const id in cos) cos[id].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const sqs = W.sq.map(q => [q.id, q.co, q.name, q.lead && W.mem[q.lead] ? W.mem[q.lead].n : '', q.mem.length]);
+    const mine = W.mem[S.id], myq = sqOfUid(S.id), k = S.mil ? S.mil.army : -1;
+    return { t: 'wroster', cos, sqs, me: { co: mine ? mine.co : null, sq: myq ? myq.id : 0, officer: k >= 0 && isOfficer(S, k), manage: W.sq.filter(q => canManage(S, q)).map(q => q.id) } };
+  }
+  const squadOf = uid => (W ? sqOfUid(uid) || null : null);
+  const cleanName = v => String(v || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 30);
+  const byName = n => { const t = String(n || '').toLowerCase(); for (const [uid, m] of Object.entries(W.mem)) if (m.n.toLowerCase() === t) return uid; return null; };
+  const tell = (uid, msg, c) => { const O = online.get(uid); if (O) toast(O, msg, c); };
+  const MIL = {
+    join(S, m) {
+      const R = coOf(Math.round(+m.id)); if (!R) return err(S, 'That company is gone.');
+      if (!S.mil) return err(S, 'Enlist in an army first.'); if (S.mil.army !== R.k) return err(S, `Only soldiers of ${KN[R.k]} can serve in the ${R.name}.`);
+      setCompany(S, R); toast(S, `You join the ${R.name}. Its roster is on your Army tab.`, 'gold');
+    },
+    leave(S) { if (!W.mem[S.id]) return; const R = coOf(W.mem[S.id].co); dropMember(S.id); toast(S, R ? `You leave the ${R.name}.` : 'You leave your company.'); },
+    sqNew(S, m) {
+      const R = coOf(Math.round(+m.id)); if (!R) return err(S, 'Pick one of your companies.');
+      if (!isOfficer(S, R.k)) return err(S, 'Only a Lieutenant or higher, the Marshal, the Monarch or an admin can form squads.');
+      const name = cleanName(m.name); if (name.length < 3) return err(S, 'Give the squad a name (3–30 letters).');
+      if (W.sq.filter(q => q.co === R.id).length >= SQ_PER_CO) return err(S, `The ${R.name} already has ${SQ_PER_CO} squads.`);
+      if (W.sq.some(q => q.co === R.id && q.name.toLowerCase() === name.toLowerCase())) return err(S, 'That company already has a squad with that name.');
+      const q = { id: ++W.sqId, co: R.id, k: R.k, name, lead: null, by: S.id, mem: [] };
+      if (S.mil && S.mil.army === R.k && m.self !== false) { unSquad(S.id); setCompany(S, R); q.mem.push(S.id); q.lead = S.id; }
+      W.sq.push(q); dirty = true; rosterDirty = true;
+      toast(S, `Squad “${name}” formed in the ${R.name}.${q.lead ? ' You lead it.' : ''} Invite soldiers from the Army tab or the player menu.`, 'gold');
+    },
+    sqInv(S, m) {
+      const q = W.sq.find(x => x.id === Math.round(+m.sq)); if (!canManage(S, q)) return err(S, 'Only the squad leader or an officer can invite to this squad.');
+      const O = byNid.get(Math.round(+m.nid)); if (!O || !O.ready) return err(S, 'That player is not online.');
+      if (!O.mil || O.mil.army !== q.k) return err(S, `${O.char.name} is not a soldier of ${KN[q.k]}.`);
+      if (q.mem.includes(O.id)) return err(S, `${O.char.name} is already in ${q.name}.`);
+      if (q.mem.length >= SQ_MAX) return err(S, `A squad holds at most ${SQ_MAX} soldiers.`);
+      const R = coOf(q.co); sqInv.set(O.id, { sq: q.id, from: S.char.name, until: Date.now() + 120000 });
+      send(O, { t: 'wsqinv', sq: q.id, name: q.name, co: R ? R.name : '', from: S.char.name }); toast(S, `Invitation sent to ${O.char.name}.`);
+    },
+    sqAcc(S, m) {
+      const inv = sqInv.get(S.id); sqInv.delete(S.id); if (!inv || inv.sq !== Math.round(+m.sq)) return err(S, 'That invitation has expired.');
+      if (!m.ok) return; const q = W.sq.find(x => x.id === inv.sq), R = q && coOf(q.co);
+      if (!q || !R) return err(S, 'That squad is gone.'); if (!S.mil || S.mil.army !== q.k) return err(S, 'You are not a soldier of that army.');
+      if (q.mem.length >= SQ_MAX) return err(S, 'That squad is full.');
+      unSquad(S.id); setCompany(S, R); q.mem.push(S.id); if (!q.lead) q.lead = S.id; dirty = true; rosterDirty = true;
+      toast(S, `You join squad ${q.name} of the ${R.name}. Use the Squad chat channel to talk to them.`, 'gold');
+      for (const u of q.mem) if (u !== S.id) tell(u, `${S.char.name} joins your squad.`);
+    },
+    sqKick(S, m) {
+      const q = W.sq.find(x => x.id === Math.round(+m.sq)); if (!canManage(S, q)) return err(S, 'Only the squad leader or an officer can do that.');
+      const uid = byName(m.name); if (!uid || !q.mem.includes(uid)) return err(S, 'They are not in that squad.');
+      if (uid === S.id) return MIL.sqLeave(S);
+      unSquad(uid); dirty = true; rosterDirty = true; tell(uid, `You were removed from squad ${q.name}.`); toast(S, `${m.name} removed from ${q.name}.`);
+    },
+    sqLead(S, m) {
+      const q = W.sq.find(x => x.id === Math.round(+m.sq)); if (!canManage(S, q)) return err(S, 'Only the squad leader or an officer can do that.');
+      const uid = byName(m.name); if (!uid || !q.mem.includes(uid)) return err(S, 'Pick a member of the squad.');
+      q.lead = uid; dirty = true; rosterDirty = true; tell(uid, `You now lead squad ${q.name}.`, 'gold'); toast(S, `${W.mem[uid].n} now leads ${q.name}.`, 'gold');
+    },
+    sqLeave(S) { const q = unSquad(S.id); if (!q) return; dirty = true; rosterDirty = true; toast(S, `You leave squad ${q.name}.`); },
+    sqDel(S, m) {
+      const q = W.sq.find(x => x.id === Math.round(+m.sq)); if (!q) return;
+      if (!(S.admin || q.by === S.id || isOfficer(S, q.k))) return err(S, 'Only an officer can disband a squad.');
+      W.sq = W.sq.filter(x => x !== q); dirty = true; rosterDirty = true; for (const u of q.mem) if (u !== S.id) tell(u, `Squad ${q.name} has been disbanded.`); toast(S, `Squad ${q.name} disbanded.`);
+    },
+  };
   const handlers = {
     async wcmd(S, m) {
-      if (!W || !m || typeof m.op !== 'string') return; const sc = scope(S); const R = W.regs.find(r => r.id === Math.round(+m.id)); const op = m.op;
+      if (!W || !m || typeof m.op !== 'string') return; if (Object.prototype.hasOwnProperty.call(MIL, m.op)) return MIL[m.op](S, m); const sc = scope(S); const R = W.regs.find(r => r.id === Math.round(+m.id)); const op = m.op;
       if (op === 'take') { if (!R || !sc || R.k !== sc.k || sc.max >= 99) return err(S, 'You cannot take command of that company.'); if (leads.has(R.id) && leads.get(R.id) !== S.id) return err(S, `${nameOf(leads.get(R.id))} already leads the ${R.name}.`); if (ledBy(S.id).length >= sc.max) return err(S, 'You already lead as many companies as your rank allows.'); leads.set(R.id, S.id); return ok(S, `You take command of the ${R.name}.`); }
       if (op === 'give') { if (R && leads.get(R.id) === S.id) { leads.delete(R.id); if (R.order.type === 'follow') R.order = { type: 'garrison', town: R.home }; } return ok(S); }
       if (op === 'order') {
@@ -397,7 +496,7 @@ module.exports = function makeWorld(ctx) {
       }
     },
   };
-  function onEnter(S) { if (!W) return; send(S, stateMsg()); send(S, regsMsg()); }
-  function onLeave(S) { for (const id of ledBy(S.id)) leads.delete(id); for (const R of W ? W.regs : []) if (R.order.type === 'follow' && R.order.uid === S.id) R.order = { type: 'hold' }; }
-  return { init, tick, save, handlers, onEnter, onLeave, get state() { return W; } };
+  function onEnter(S) { if (!W) return; send(S, stateMsg()); send(S, regsMsg()); refresh(S); send(S, rosterMsg(S)); }
+  function onLeave(S) { sqInv.delete(S.id); rosterDirty = true; for (const id of ledBy(S.id)) leads.delete(id); for (const R of W ? W.regs : []) if (R.order.type === 'follow' && R.order.uid === S.id) R.order = { type: 'hold' }; }
+  return { init, tick, save, handlers, onEnter, onLeave, refresh, dropMember, squadOf, get state() { return W; } };
 };

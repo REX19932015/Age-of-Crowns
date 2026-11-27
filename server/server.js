@@ -55,6 +55,18 @@ const OFFICE_NAMES = { monarch: 'Monarch', chancellor: 'Chancellor', treasurer: 
 const RANKS = W.ranks;
 // Ranks up to Warrant Officer are earned in the field; every rank above it is granted by an admin.
 const WARRANT = RANKS.indexOf('Warrant Officer'), MAX_RANK = RANKS.length - 1;
+const LIEUT = RANKS.indexOf('Lieutenant'), MERIT_CAP = RANKS.indexOf('Corporal'), COLONEL = RANKS.indexOf('Colonel');
+// the chain of command: the highest rank S may give soldier O (or -1 if S has no authority over O).
+// Admins: any rank. The Monarch or Marshal of O's army: up to Colonel. An officer (Lieutenant and up) of the same army:
+// only soldiers junior to them, and only up to one rank below their own.
+function rankAuthority(S, O) {
+  if (!O || !O.mil) return -1;
+  if (S.admin) return MAX_RANK;
+  const k = O.mil.army;
+  if (offices[k] && (offices[k].monarch === S.id || offices[k].marshal === S.id)) return S === O ? -1 : COLONEL;
+  if (S !== O && S.mil && S.mil.army === k && S.mil.rank >= LIEUT && O.mil.rank < S.mil.rank) return S.mil.rank - 1;
+  return -1;
+}
 // Specialised corps. Only admins assign them, except that a line Warrant Officer may volunteer for the Storm Troopers.
 const CORPS = { line: 'Line Infantry', sniper: 'Snipers', storm: 'Storm Troopers', heavy: 'Heavy Infantry' };
 const CORPS_HAT = { line: 'stahlhelm', sniper: 'ghillie', storm: 'stahlhelm', heavy: 'heavyhelm' };
@@ -231,13 +243,14 @@ async function applySave(S, blob, wseq, force) {
   if (army !== (S.mil ? S.mil.army : -1)) await setArmy(S, army);
   if (S.mil) {
     const want = clampInt(blob.rank, 0, MAX_RANK);
-    // the game may only lower a rank, or raise it one step at a time up to Warrant Officer; officer ranks come from admins
-    if (want < S.mil.rank && want < WARRANT && S.mil.rank <= WARRANT) { S.mil.rank = want; q(db.update('military_members', { user_id: S.id }, { rank: want })); }
+    // merit earned in the game climbs one step at a time up to Corporal; from Sergeant up, promotions come from officers
+    const capNote = 'From Sergeant up, promotions are given by your officers (a Lieutenant or higher), the Marshal or an admin.';
+    if (want < S.mil.rank && S.mil.rank <= MERIT_CAP) { S.mil.rank = want; q(db.update('military_members', { user_id: S.id }, { rank: want })); }
     else if (want > S.mil.rank) {
-      if (S.mil.rank >= WARRANT) send(S, { t: 'rankSet', rank: S.mil.rank, note: 'Ranks above Warrant Officer are granted by the realm’s admins.' });
+      if (S.mil.rank >= MERIT_CAP) { if (now() - (S.mil.noteAt || 0) > 600000) { S.mil.noteAt = now(); send(S, { t: 'rankSet', rank: S.mil.rank, note: capNote }); } else send(S, { t: 'rankSet', rank: S.mil.rank, note: '' }); }
       else {
-        if (now() - (S.mil.lastUp || 0) > 90000) { S.mil.rank++; S.mil.lastUp = now(); q(db.update('military_members', { user_id: S.id }, { rank: S.mil.rank })); }
-        if (S.mil.rank < want) send(S, { t: 'rankSet', rank: S.mil.rank, note: S.mil.rank >= WARRANT ? 'Ranks above Warrant Officer are granted by the realm’s admins.' : 'Promotions are confirmed by the army one rank at a time.' });
+        if (now() - (S.mil.lastUp || 0) > 90000) { S.mil.rank++; S.mil.lastUp = now(); q(db.update('military_members', { user_id: S.id }, { rank: S.mil.rank })); if (WORLD) WORLD.refresh(S); }
+        if (S.mil.rank < want) send(S, { t: 'rankSet', rank: S.mil.rank, note: S.mil.rank >= MERIT_CAP ? capNote : 'Promotions are confirmed by the army one rank at a time.' });
       }
     } else if (want < S.mil.rank) send(S, { t: 'rankSet', rank: S.mil.rank, note: '' });
     c.army = S.mil.army; c.army_rank = S.mil.rank;
@@ -265,6 +278,7 @@ async function flush(S) {
 
 // ---------------------------------------------------------------- military
 async function setArmy(S, army) {
+  if (WORLD) WORLD.dropMember(S.id);
   if (army < 0) {
     if (S.mil) { await leaveRegiment(S, true); await q(db.remove('military_members', { user_id: S.id })); S.mil = null; announcePlayer(S); }
     return;
@@ -459,7 +473,7 @@ function tickMovement() {
   for (const S of online.values()) S.moved = false;
 }
 function tickRoster() {
-  const list = [...online.values()].filter(S => S.ready).map(S => ({ nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), x: fin(S.x) ? Math.round(S.x) : null, z: fin(S.z) ? Math.round(S.z) : null, army: S.mil ? S.mil.army : -1 }));
+  const list = [...online.values()].filter(S => S.ready).map(S => ({ nid: S.nid, name: S.char.name, k: S.char.kingdom, title: titleOf(S), x: fin(S.x) ? Math.round(S.x) : null, z: fin(S.z) ? Math.round(S.z) : null, army: S.mil ? S.mil.army : -1, rank: S.mil ? S.mil.rank : -1, corps: S.mil ? (corpsOf(S) || 'line') : '' }));
   each(S => send(S, { t: 'roster', list }));
 }
 function tickEvents(dt) {
@@ -507,6 +521,11 @@ async function onChat(S, m) {
     const a = S.mil.army, msg = { ...base, ch: 'army', rank: RANKS[S.mil.rank] };
     pushHistory('army:' + a, msg); each(O => { if (O.mil && O.mil.army === a) send(O, msg); });
     q(db.insert('chat_messages', { channel: 'army:' + a, sender: S.id, sender_name: S.char.name, body }, { returning: false }));
+  } else if (ch === 'squad') {
+    const sq = WORLD && WORLD.squadOf(S.id);
+    if (!sq) return err(S, 'You are not in a squad. Your officers can add you to one from the Army tab.');
+    const msg = { ...base, ch: 'squad', rank: S.mil ? RANKS[S.mil.rank] : '', sq: sq.name };
+    for (const uid of sq.mem) { const O = online.get(uid); if (O && O.ready) send(O, msg); }
   } else if (ch === 'pm') {
     await privateMessage(S, str(m.to, 24), body);
   } else err(S, 'Unknown chat channel.');
@@ -537,7 +556,7 @@ async function command(S, body) {
     const sp = nmLen || arg.indexOf(' '); if (sp < 1) return err(S, 'Use: /w Name message');
     if (!chatAllowed(S, arg)) return; return privateMessage(S, arg.slice(0, sp), arg.slice(sp + 1).trim());
   }
-  if (c === 'g' || c === 'l' || c === 'k' || c === 'a') return onChat(S, { ch: { g: 'global', l: 'local', k: 'kingdom', a: 'army' }[c], body: arg });
+  if (c === 'g' || c === 'l' || c === 'k' || c === 'a' || c === 's') return onChat(S, { ch: { g: 'global', l: 'local', k: 'kingdom', a: 'army', s: 'squad' }[c], body: arg });
   if (c === 'online') return toast(S, `${online.size} player${online.size === 1 ? '' : 's'} online.`);
   if (!S.admin) return err(S, 'Unknown command. Try /w Name message, /g, /l, /k, /a, /online.');
   if (c === 'announce') return system('global', '📜 ' + arg);
@@ -742,15 +761,32 @@ const H = {
     O.mil.role = role; await q(db.update('military_members', { user_id: O.id }, { regiment_role: role }));
     send(O, { t: 'mil', mil: milInfo(O) }); toast(O, `You are now a regiment ${role}.`); toast(S, `${O.char.name} is now a regiment ${role}.`);
   },
-  async armyPromote(S, m) {   // the Marshal or Monarch sets a soldier's rank in their kingdom's army
+  async armyPromote(S, m) {   // the chain of command sets a soldier's rank (see rankAuthority)
     const O = byNid.get(m.nid); if (!O || !O.ready || !O.mil) return err(S, 'They are not a soldier.');
-    const k = O.mil.army; const isMon = offices[k].monarch === S.id, isMar = offices[k].marshal === S.id;
-    if (!isMon && !isMar && !S.admin) return err(S, `Only the Marshal or Monarch of ${KNAMES[k]} can promote its soldiers.`);
-    const r = clampInt(m.rank, 0, S.admin ? MAX_RANK : WARRANT);   // field promotions stop at Warrant Officer; officers are made by admins
+    const cap = rankAuthority(S, O);
+    if (cap < 0) return err(S, O === S ? 'You cannot promote yourself.' : `Only a superior officer (Lieutenant or higher and senior to ${O.char.name}), the Marshal or Monarch of ${KNAMES[O.mil.army]}, or an admin can set ${O.char.name}'s rank.`);
+    const r = clampInt(m.rank, 0, MAX_RANK);
+    if (r > cap) return err(S, `You can give ranks up to ${RANKS[cap]}.`);
+    if (r === O.mil.rank) return toast(S, `${O.char.name} is already ${RANKS[r]}.`);
+    const up = r > O.mil.rank;
     O.mil.rank = r; O.mil.lastUp = now(); await q(db.update('military_members', { user_id: O.id }, { rank: r }));
     O.char.army_rank = r; O.dirty = true;
-    send(O, { t: 'rankSet', rank: r, by: S.char.name }); announcePlayer(O);
-    toast(S, `${O.char.name} is now ${RANKS[r]}.`);
+    send(O, { t: 'rankSet', rank: r, by: S.char.name }); send(O, { t: 'mil', mil: milInfo(O) }); announcePlayer(O);
+    if (WORLD) WORLD.refresh(O);
+    toast(S, `${O.char.name} is now ${RANKS[r]}.`, 'gold');
+    system('army', `${S.char.name} ${up ? 'promotes' : 'demotes'} ${O.char.name} to ${RANKS[r]}.`, X => X.mil && X.mil.army === O.mil.army);
+  },
+  async armyCorps(S, m) {   // only a Lieutenant or higher (senior to the soldier), the Marshal, the Monarch or an admin assigns a division
+    const O = byNid.get(m.nid); if (!O || !O.ready || !O.mil) return err(S, 'They are not a soldier.');
+    const corps = CORPS[m.corps] ? m.corps : null; if (!corps) return err(S, 'No such division.');
+    if (rankAuthority(S, O) < 0) return err(S, O === S ? 'Ask one of your officers to assign you a division.' : `Only a superior officer (Lieutenant or higher and senior to ${O.char.name}), the Marshal or Monarch, or an admin can assign ${O.char.name} a division.`);
+    if (corpsOf(O) === corps) return toast(S, `${O.char.name} already serves in the ${CORPS[corps]}.`);
+    O.mil.corps = corps; await q(db.update('military_members', { user_id: O.id }, { corps }));
+    O.vlook = lockLook(O, O.vlook); send(O, { t: 'mil', mil: milInfo(O) }); send(O, { t: 'rankSet', rank: O.mil.rank, corps, note: '' }); announcePlayer(O);
+    if (WORLD) WORLD.refresh(O);
+    if (O !== S) toast(O, `${S.char.name} assigns you to the ${CORPS[corps]}.`, 'gold');
+    toast(S, `${O.char.name} now serves in the ${CORPS[corps]}.`, 'gold');
+    system('army', `${S.char.name} assigns ${O.char.name} to the ${CORPS[corps]}.`, X => X.mil && X.mil.army === O.mil.army);
   },
   // ---- government, elections and parliament
   async elecCall(S, m) {
@@ -832,7 +868,8 @@ const H = {
     send(S, { t: 'kingdom', k, pol: p }); announcePlayer(S); toast(S, `You are now a citizen of ${KNAMES[k]}.`, 'gold');
   },
   // ---- specialised corps
-  async joinStorm(S) {   // the one corps a soldier can volunteer for: line Warrant Officers may join the Storm Troopers
+  async joinStorm(S) {   // retired: divisions are now assigned by officers
+    return err(S, 'Divisions other than the Line Infantry are assigned by a Lieutenant or higher, the Marshal, the Monarch or an admin. Ask one of your officers.');
     if (!S.mil) return err(S, 'Enlist in an army first.');
     if (corpsOf(S) !== 'line') return err(S, `You already serve in the ${CORPS[corpsOf(S)]}. Only an admin can transfer you.`);
     if (S.mil.rank !== WARRANT) return err(S, `Only a Warrant Officer of the line may volunteer for the Storm Troopers.`);
@@ -866,7 +903,7 @@ const H = {
       T.mil.rank = rank; T.mil.corps = cps; T.mil.lastUp = now(); T.char.army = army; T.char.army_rank = rank; T.dirty = true;
       await q(db.update('military_members', { user_id: uid }, { rank, corps: cps }));
       T.vlook = lockLook(T, T.vlook);
-      send(T, { t: 'mil', mil: milInfo(T) }); send(T, { t: 'rankSet', rank, by: S.char.name, army, corps: cps }); announcePlayer(T);
+      send(T, { t: 'mil', mil: milInfo(T) }); send(T, { t: 'rankSet', rank, by: S.char.name, army, corps: cps }); announcePlayer(T); if (WORLD) WORLD.refresh(T);
       if (T !== S) toast(T, `${S.char.name} makes you ${RANKS[rank]} of the ${CORPS[cps]}, ${KNAMES[army]} Army.`, 'gold');
     } else {
       await q(db.insert('military_members', { user_id: uid, army, rank, corps: cps, regiment_id: cur && cur.army === army ? cur.regiment_id : null, regiment_role: cur && cur.army === army ? cur.regiment_role : 'member' }, { upsert: true, onConflict: 'user_id', returning: false }));
@@ -986,7 +1023,7 @@ let seaBusy = false, seaLast = now();
 setInterval(async () => { if (seaBusy) return; seaBusy = true; const t = now(); try { await SEA.tick((t - seaLast) / 1000); } catch (e) { log('season tick error', e.stack || e.message); } seaLast = t; seaBusy = false; }, 1000);
 
 // ---------------------------------------------------------------- the shared realm
-WORLD = require('./world')({ db, log, each, send, err, toast, online, offices, nameOf, TOWNS, KNAMES, RANKS, changeGold });
+WORLD = require('./world')({ db, log, each, send, err, toast, online, offices, nameOf, TOWNS, KNAMES, RANKS, changeGold, byNid, CORPS, system });
 for (const [k, fn] of Object.entries(WORLD.handlers)) H[k] = fn;
 let wLast = now();
 setInterval(() => { const t = now(); try { WORLD.tick(Math.min(2, (t - wLast) / 1000)); } catch (e) { log('world tick error', e.stack || e.message); } wLast = t; }, 250);

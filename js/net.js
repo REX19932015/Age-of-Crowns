@@ -563,21 +563,12 @@
     ['Appointed by a General, the Marshal or the Monarch.', 'Commands the whole army and enlists recruits. Promotes up to Major.'],
     ['Appointed by the realm\'s admins.', 'Full command: builds forts and can hand the army to the Lord Marshal. Promotes up to Colonel.']];
   const TIERS = [['Enlisted', 0, 3, '#6fae55'], ['Non-commissioned officers', 4, 5, '#d1a73a'], ['Warrant officer', 6, 6, '#de8a3c'], ['Commissioned officers', 7, 9, '#5b93d1'], ['High command', 10, 11, '#b061d6']];
+  // the rank plaque, as worn on the uniform: blue tiles for the enlisted steps, red tiles for officers (gold frame: General)
   function rankSvg(i, px = 40) {
-    const G = '#f0c75e', D = '#5a3d0c';
-    const chev = y => `<path d="M11 ${y + 10} L30 ${y} L49 ${y + 10}" fill="none" stroke="${G}" stroke-width="4.6" stroke-linejoin="miter"/>`;
-    const rock = y => `<path d="M11 ${y} Q30 ${y + 10} 49 ${y}" fill="none" stroke="${G}" stroke-width="4.6"/>`;
-    const pip = (x, y, R = 6.5) => { let d = ''; for (let k = 0; k < 16; k++) { const a = Math.PI * k / 8 - Math.PI / 2, r = k % 2 ? R * .45 : R; d += (k ? 'L' : 'M') + (x + Math.cos(a) * r).toFixed(1) + ' ' + (y + Math.sin(a) * r).toFixed(1); } return `<path d="${d}Z" fill="${G}" stroke="${D}" stroke-width=".8"/>`; };
-    const crown = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-12 5 L-14 -8 L-6 -1 L0 -12 L6 -1 L14 -8 L12 5 Z" fill="${G}" stroke="${D}" stroke-width="1.2"/><rect x="-12.5" y="5" width="25" height="5" rx="1" fill="${G}" stroke="${D}" stroke-width="1.1"/><circle cx="0" cy="-12" r="2" fill="${G}"/></g>`;
-    const B = [
-      `<rect x="16" y="22" width="28" height="16" rx="3" fill="none" stroke="${G}" stroke-width="3" opacity=".5"/>`,
-      chev(25), chev(18) + chev(30), chev(12) + chev(24) + chev(36),
-      chev(7) + chev(18) + chev(29) + rock(42), chev(4) + chev(14) + chev(24) + rock(37) + rock(47),
-      `<circle cx="30" cy="31" r="19" fill="none" stroke="${G}" stroke-width="3" stroke-dasharray="4 2.6"/>` + crown(30, 32, .95),
-      pip(30, 20) + pip(30, 41), pip(30, 13) + pip(30, 30) + pip(30, 47),
-      crown(30, 31, 1.35), crown(30, 17, .95) + pip(30, 37, 5.5) + pip(30, 50, 5.5),
-      `<path d="M13 51 L47 15 M47 51 L13 15" stroke="${G}" stroke-width="3.6" stroke-linecap="round"/><path d="M10 47 l8 8 M50 47 l-8 8" stroke="${G}" stroke-width="3.2"/>` + crown(30, 15, .7)];
-    return `<svg class="aocrk" viewBox="0 0 60 60" width="${px}" height="${px}" role="img" aria-label="${esc(A().RANKS[i] ? A().RANKS[i].n : '')} insignia"><rect x="1.5" y="1.5" width="57" height="57" rx="9" fill="#1d2838" stroke="#8a6a2a" stroke-width="2"/>${B[i] || ''}</svg>`;
+    const blue = i <= 1 ? 1 : Math.min(6, i), red = i >= 11 ? 6 : i >= 7 ? i - 6 : 0;
+    let t = '';
+    for (let row = 0; row < 2; row++) for (let k = 0; k < 6; k++) { const on = row === 0 ? k < red : k < blue; t += `<rect x="${7.5 + k * 7.8}" y="${row === 0 ? 21 : 31.5}" width="6" height="7.5" rx="1" fill="${on ? (row === 0 ? '#cf3530' : '#2f6fd6') : '#2a2e35'}"/>`; }
+    return `<svg class="aocrk" viewBox="0 0 60 60" width="${px}" height="${px}" role="img" aria-label="${esc(A().RANKS[i] ? A().RANKS[i].n : '')} plaque"><rect x="1.5" y="1.5" width="57" height="57" rx="9" fill="#1d2838" stroke="#8a6a2a" stroke-width="2"/>${i >= 11 ? '<rect x="3.5" y="16" width="53" height="28" rx="3" fill="#d9b24a"/>' : ''}<rect x="5" y="17.5" width="50" height="25" rx="2.5" fill="#9aa1aa" stroke="#5d636b" stroke-width="1"/>${t}</svg>`;
   }
   // the highest rank I may give this soldier (online roster row), or -1; the server checks the same rule
   function myAuth(r) {
@@ -594,7 +585,8 @@
       <p class="aocsmall">One chain of command for every real soldier. Merit earned in battle carries you up to Corporal. From Sergeant up, a senior officer promotes you. Officers can only promote or demote soldiers junior to them, and only up to one rank below their own. The Marshal and the Monarch can appoint up to Colonel; Generals are made by the realm's admins.</p>
       <div class="aocrkchart">${TIERS.map(([n, a, b, c]) => `<div class="aocrktier" style="--tc:${c}"><div class="aocrktn">${n}</div>${RK.slice(a, b + 1).map((r, j) => { const i = a + j; return `<div class="aocrkrow">${rankSvg(i, 46)}<div class="aocrkt"><b>${esc(r.n)}</b><div class="aocsmall"><b>Earned:</b> ${esc(RANK_INFO[i][0])}</div><div class="aocsmall"><b>Duties:</b> ${esc(RANK_INFO[i][1])}</div></div></div>`; }).join('')}</div>`).join('')}</div>
       <p class="aocsmall"><b>Divisions:</b> every soldier starts in the Line Infantry. Only a Lieutenant or higher (senior to the soldier), the Marshal, the Monarch or an admin can move a soldier to the Storm Troopers, the Heavy Infantry or the Snipers.</p>
-      <p class="aocsmall"><b>Companies and squads:</b> any soldier can join a company of their army. Officers form squads inside companies and add soldiers to them. A squad has a leader (often an NCO), its own chat channel, and its members are marked ◆ in blue.</p>`;
+      <p class="aocsmall"><b>Companies and squads:</b> any soldier can join a company of their army. Officers form squads inside companies and add soldiers to them. A squad has a leader (often an NCO), its own chat channel, and its members are marked ◆ in blue.</p>
+      <p class="aocsmall"><b>The rank plaque:</b> every soldier wears their rank as a plaque on the left breast. Blue tiles count the enlisted steps, red tiles the officer steps; the General's plaque has a gold frame.</p>`;
   }
   function armyTab() {
     const m = N.mil, RK = A().RANKS, K = A().K;

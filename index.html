@@ -5513,11 +5513,15 @@ let ENL={tgt:'new',n:100};
 const FIELD={foot:{n:3,size:20},horse:{n:2,size:12},guns:{n:2,size:6}};
 const RES=[0,1,2,3].map(()=>({foot:0,horse:0,guns:0}));
 const DIVS={
- foot:{line:{n:'Line infantry',d:'Steady ranks and disciplined volleys.',atk:1,def:1,spd:1,gap:2.3},
-  shock:{n:'Shock troops',d:'Rush the enemy and fight hand to hand.',atk:1.3,def:.85,spd:1.2,gap:2.1,melee:1},
-  light:{n:'Light infantry',d:'Skirmishers in loose order: quick and accurate.',atk:1.05,def:.9,spd:1.3,gap:4.2,acc:1.35},
-  grenadier:{n:'Grenadiers',d:'Big, tough and hard to break. They stand firm against cavalry.',atk:1.1,def:1.25,spd:.9,gap:2.4,hp:1.35},
-  guard:{n:'Royal Guard',d:'Elite veterans who almost never break.',atk:1.15,def:1.15,spd:1,gap:2.2,mor:1.7}},
+ foot:{line:{n:'Line Infantry',d:'Steady ranks and disciplined volleys.',atk:1,def:1,spd:1,gap:2.3},
+  storm:{n:'Shock Troopers',d:'Lead the assault: they rush the enemy and fight hand to hand.',atk:1.3,def:.85,spd:1.2,gap:2.1,melee:1},
+  heavy:{n:'Heavy Infantry',d:'Armoured breakthrough troops: hard to hurt and hard to break, but slow.',atk:1.1,def:1.3,spd:.85,gap:2.4,hp:1.4},
+  sniper:{n:'Snipers',d:'Ghillie-suited marksmen in loose order: deadly accurate from far away, fragile up close.',atk:1.25,def:.8,spd:.95,gap:5,acc:2.2},
+  raider:{n:'Trench Raiders',d:'Night fighters who close fast and finish it with clubs and bayonets.',atk:1.2,def:.9,spd:1.3,gap:2.6,melee:1},
+  gas:{n:'Gas Sentinels',d:'Masked veterans who hold their ground through anything.',atk:1.1,def:1.15,spd:1,gap:2.2,mor:1.7},
+  flamer:{n:'Flame Pioneers',d:'Assault engineers whose fire breaks defenders: brutal up close, short-ranged.',atk:1.45,def:1.05,spd:.95,gap:2.4,melee:1},
+  ranger:{n:'Frost Rangers',d:'Scouts in loose order: quick on their feet and accurate.',atk:1.05,def:.9,spd:1.3,gap:4.2,acc:1.4},
+  aviator:{n:'Sky Corps',d:'Light, fast troops who strike where they are least expected.',atk:.95,def:.85,spd:1.45,gap:3.4,acc:1.1}},
  horse:{hussar:{n:'Hussars',d:'Light, fast riders who harass and chase.',atk:1,def:.9,spd:1.3,gap:3.4,melee:1},
   dragoon:{n:'Dragoons',d:'Ride up, fire their carbines, then charge with the sabre.',atk:1.05,def:1,spd:1.1,gap:3.4,melee:1,gun:1},
   cuirassier:{n:'Cuirassiers',d:'Armoured heavy cavalry that smash through lines.',atk:1.35,def:1.25,spd:.9,gap:3.6,melee:1,hp:1.4}},
@@ -5529,7 +5533,7 @@ const CFORMS={line:'Line',column:'Column',square:'Square',skirmish:'Open order'}
 const STANCES={attack:'Attack on sight',defend:'Hold ground and return fire',hold:'Hold fire'};
 const COMPNAME={foot:'Company',horse:'Troop',guns:'Battery'};
 const regTy=R=>R.type||'foot';
-const divOf=R=>DIVS[regTy(R)][R.div]||DIVS[regTy(R)][DIV0[regTy(R)]];
+const DIVMAP={shock:'storm',grenadier:'heavy',light:'ranger',guard:'gas'};const divOf=R=>{if(DIVMAP[R.div]&&regTy(R)==='foot')R.div=DIVMAP[R.div];return DIVS[regTy(R)][R.div]||DIVS[regTy(R)][DIV0[regTy(R)]];};
 const compSize=R=>FIELD[regTy(R)].size;
 
 // ---- who may command: Lieutenant 1 company, Captain 2, Major 4, Colonel every company and recruiting, General (and rulers, admin) everything
@@ -5573,7 +5577,7 @@ function gunSpot(R,g){const D=divOf(R);const n=Math.max(1,R.sol?R.sol.length:R.s
 // ---- bringing a company to life near the player, and putting it away again
 const MATR=190,DEMATR=240,MATCAP=150;
 function soldierLook(R,i){const ty=regTy(R),kk=K[R.k],off=i===0;const o={coat:kk.coat,trim:kk.trim,hat:'stahlhelm',pants:shadeHex(kk.coat,.72),musket:true,epaulettes:off,officer:off};
- if(ty==='foot')o.corps={shock:'storm',grenadier:'heavy',light:R.k===0?'ranger':'raider',guard:'gas'}[R.div]||'line';
+ if(ty==='foot'){divOf(R);o.corps=SLEEKU.has(R.div)?R.div:'line';}
  else if(ty==='horse'){o.corps='cuirassier';o.musket=off;}
  else{o.corps='heavy';o.musket=off;}
  return o;}

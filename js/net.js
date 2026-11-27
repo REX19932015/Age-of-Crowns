@@ -636,7 +636,7 @@
     });
   }
   const fmtN = n => Number(n || 0).toLocaleString('en');
-  const CORPS_N = { line: 'Line Infantry', storm: 'Storm Troopers', heavy: 'Heavy Infantry', raider: 'Trench Raiders', gas: 'Gas Sentinels', flamer: 'Flame Pioneers', ranger: 'Frost Rangers', aviator: 'Sky Corps', cuirassier: 'Royal Cuirassiers' };
+  const CORPS_N = { line: 'Line Infantry', sniper: 'Snipers', storm: 'Storm Troopers', heavy: 'Heavy Infantry', raider: 'Trench Raiders', gas: 'Gas Sentinels', flamer: 'Flame Pioneers', ranger: 'Frost Rangers', aviator: 'Sky Corps', cuirassier: 'Royal Cuirassiers' };
 
   // ------------------------------------------------------------------ home screen
   const NEWS = [

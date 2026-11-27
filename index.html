@@ -394,7 +394,7 @@ const RANKS=[{n:'Recruit',m:0},{n:'Private',m:3},{n:'Lance Corporal',m:8},{n:'Co
 // merit carries a soldier up to Warrant Officer; every rank above it is granted by an admin
 const WARRANT_R=6,OFFICER_R=7,COLONEL_R=10;
 // specialised corps: their helmet, gear and the perk weapon each one carries
-const CORPS={line:{n:'Line Infantry',hat:'stahlhelm',gun:null,arm:0},storm:{n:'Storm Troopers',hat:'stahlhelm',gun:'storm',arm:0},ironmask:{n:'Ironmask Corps',hat:'ironmask',gun:'marksman',arm:.15},heavy:{n:'Heavy Infantry',hat:'heavyhelm',gun:'tankgun',arm:.25},officer:{n:'Officer Corps',hat:'pickelhaube',gun:'autopistol',arm:0}};
+const CORPS={line:{n:'Line Infantry',hat:'stahlhelm',gun:null,arm:0},storm:{n:'Storm Troopers',hat:'stahlhelm',gun:'storm',arm:0},heavy:{n:'Heavy Infantry',hat:'heavyhelm',gun:'tankgun',arm:.25},raider:{n:'Trench Raiders',hat:'raiderhelm',gun:'trenchgun',arm:.1},gas:{n:'Gas Sentinels',hat:'gashelm',gun:'semiauto',arm:.05},flamer:{n:'Flame Pioneers',hat:'flamehelm',gun:'flamer',arm:.15},ranger:{n:'Frost Rangers',hat:'snowhood',gun:'marksman',arm:0},aviator:{n:'Sky Corps',hat:'flycap',gun:'autopistol',arm:0},cuirassier:{n:'Royal Cuirassiers',hat:'cuirhelm',gun:'cavcarbine',arm:.3}};
 const corpsNow=()=>CORPS[P.corps]?P.corps:'line';
 const FIRST=['Pip','Bramble','Clover','Hazel','Barnaby','Thistle','Juniper','Wren','Fennel','Maple','Tobias','Mirabel','Rowan','Basil','Sorrel','Ember','Quill','Nutmeg','Percival','Tansy','Oswin','Marigold','Cedric','Poppy','Alder','Linden','Sage','Bryony','Corwin','Elspeth','Hob','Greta'];
 const LAST=['Whiskerton','Cheddarby','Longtail','Nibbleworth','Crumbsworth','Squeakley','Brambletail','Seedwhistle','Furrowby','Quickpaw','Greyfur','Copperwhisk','Holloway','Thimble','Acornfield','Pockettail'];
@@ -440,7 +440,7 @@ function mixHex(a,b,t){const c=new THREE.Color(a).lerp(new THREE.Color(b),t);ret
 // ================= GEOMETRY HELPERS =================
 
 // ================= GUN MODELS =================
-const GUNMUZ={musket:1.2,rifle:1.6,pistol:.52,blunderbuss:1.1,storm:1.05,marksman:1.62,tankgun:1.96,autopistol:.46};
+const GUNMUZ={musket:1.2,rifle:1.6,pistol:.52,blunderbuss:1.1,storm:1.05,marksman:1.62,tankgun:1.96,autopistol:.46,trenchgun:1.1,semiauto:1.32,flamer:1.15,cavcarbine:.98};
 function finVB(v,gf){const fc=c=>{if(typeof c!=='string'||c[0]!=='#')return c;const C=new THREE.Color(c),hsl={};C.getHSL(hsl);const h=hsl.h*360;if(hsl.s<.14)return mixHex(gf.metal,c,.35);if(h>=12&&h<=42&&hsl.l<.42)return mixHex(gf.wood,c,.3);if(h>=30&&h<=62&&hsl.l>=.42&&hsl.s>.35)return mixHex(gf.brass,c,.2);return c;};return new Proxy(v,{get(o,p){if(p==='add')return(g,c,m,c2)=>o.add(g,fc(c),m,c2&&fc(c2));if(p==='tube')return(a,b,n,c,...r)=>o.tube(a,b,n,fc(c),...r);const x=o[p];return typeof x==='function'?x.bind(o):x;}});}
 function gunVB(v,ty){const st='#2b2d31',stL='#45484e',dark='#1c1d20',wd='#5a3a20',wdD='#3a2414',brass='#b08a3a';
  // First World War arms. The barrel runs up +y from the receiver at y=0; the stock hangs below and behind.
@@ -471,6 +471,11 @@ function gunVB(v,ty){const st='#2b2d31',stL='#45484e',dark='#1c1d20',wd='#5a3a20
  if(ty==='autopistol'){v.add(GB.cyl,st,TM(0,.05,.01,.02,.4,.02),stL);v.add(GB.boxc,st,TM(0,.06,.008,.04,.2,.05));
   v.add(GB.cylc,stL,TM(0,-.03,.045,.022,.05,.022,0,0,PI/2));v.add(GB.sphs,stL,TM(.032,-.03,.045,.018));v.add(GB.sphs,stL,TM(-.032,-.03,.045,.018));   // toggle
   v.add(GB.boxc,wd,TM(0,-.12,-.08,.042,.22,.075,.75,0,0),wdD);v.add(GB.boxc,dark,TM(0,-.2,-.14,.034,.04,.06,.75,0,0));v.add(GB.torus,st,TM(0,-.04,-.045,.03,.035,.3,0,PI/2,0));return;}
+ if(ty==='trenchgun'){gunVB(v,'blunderbuss');v.add(GB.boxc,stL,TM(0,1.25,-.045,.01,.3,.035));v.add(GB.cone8,stL,TM(0,1.4,-.045,.012,.06,.03));return;}   // the raiders' gun takes a bayonet
+ if(ty==='semiauto'){boltArm(1.32,1.06,false);v.add(GB.boxc,dark,TM(0,.02,-.1,.05,.2,.09));v.add(GB.boxc,dark,TM(0,-.08,-.13,.048,.04,.08));v.add(GB.cylc,stL,TM(0,.6,.045,.018,.5,.018));return;}   // box magazine and a gas tube
+ if(ty==='cavcarbine'){boltArm(.95,.7,false);v.add(GB.cylc,stL,TM(.05,-.05,-.05,.01,.4,.01));v.add(GB.torus,stL,TM(.06,.1,-.05,.03,.03,.3,0,PI/2,0));return;}   // short barrel, saddle ring
+ if(ty==='flamer'){v.add(GB.cyl,st,TM(0,-.1,0,.03,1.2,.03),stL);v.add(GB.cylc,'#3a3a34',TM(0,1.08,0,.05,.12,.05));v.add(GB.cylc,brass,TM(0,1.0,.06,.022,.1,.022));v.add(GB.sphs,'#ff8a2a',TM(0,1.2,0,.03));   // wand, nozzle and pilot light
+  v.add(GB.boxc,wd,TM(0,.3,-.06,.05,.22,.06),wdD);v.add(GB.boxc,wd,TM(0,-.12,-.08,.045,.2,.075,.6,0,0),wdD);v.add(GB.torus,st,TM(0,-.04,-.05,.03,.035,.3,0,PI/2,0));v.add(GB.cylc,'#24221e',TM(0,-.3,-.02,.03,.25,.03,.4,0,0));return;}
  if(ty==='blunderbuss'){ // pump-action trench shotgun with a ventilated heat shield
   v.add(GB.cyl,st,TM(0,-.02,.01,.032,1.1,.032),stL);v.add(GB.cyl,st,TM(0,-.02,-.045,.024,.8,.024));
   v.add(GB.boxc,wd,TM(0,.5,-.045,.06,.28,.07),wdD);for(let i=0;i<5;i++)v.add(GB.boxc,wdD,TM(0,.39+i*.055,-.045,.064,.012,.074));        // ribbed pump
@@ -1571,10 +1576,11 @@ const MOUSE_SDF={"v": 6970, "t": 14000, "i32": false, "pos": "gQeCIvTAGwfdIgDB0Q
 function skinMat(m,o){// a skinned body needs a skinning copy of any material put on it
  if(!o.isSkinnedMesh)return m;if(!m._sk){m._sk=m.clone();m._sk.skinning=true;}return m._sk;}
 const _muBase={},_muGeo=new Map();
+const SLEEKU=new Set(['line','storm','heavy','raider','gas','flamer','ranger','aviator','cuirassier']);
 function unitOf(o){// soldiers wear a studio unit morph (Regiments, Great War Corps) from js/morphs.js: one seamless uniform + helmet + gear, skinned like the body; regions 1 uniform, 2 facings, 3 breeches take kingdom colours
 const M=window.MORPHS||{};let u=null;
- if(o.corps)u={line:'line',storm:'stormtrooper',ironmask:'ironmask',heavy:'sapper',officer:'officer'}[o.corps]||'line';
- else if(o.crossbelt)u=(o.hat==='furcap'||o.hat==='shako')?'grenadier':o.hat==='tricorn'?'musketeer':'regiment';
+ if(o.corps)u=SLEEKU.has(o.corps)?o.corps:'line';
+ else if(o.crossbelt)u='line';   // every soldier with a musket wears the new line kit
  else if(o.epaulettes)u='officercoat';   // officers: the regimental coat without crossbelts, under their own hat
  else if(o.coat)u=o.apron?'civapron':(o.hat==='cap'||o.hat==='bandana'||o.hat==='wide')?'civtunic':'civcoat';   // everyone else wears everyday clothes: a work tunic or a town coat
  return u&&M[u]?u:null;}
@@ -1590,17 +1596,17 @@ function mouseUnitGeo(u,coat,trim,pants){
  for(let i=0;i<b.N;i++){const r=b.reg[i],c=cs[r];if(c){const k=b.Bl[i*3];col[i*3]=c.r*k;col[i*3+1]=c.g*k;col[i*3+2]=c.b*k;}else{col[i*3]=b.Bl[i*3];col[i*3+1]=b.Bl[i*3+1];col[i*3+2]=b.Bl[i*3+2];}}
  g=new THREE.BufferGeometry();g.setAttribute('position',b.pos);g.setAttribute('normal',b.nor);g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('skinIndex',b.ski);g.setAttribute('skinWeight',b.skw);g.setIndex(b.idx);g.computeBoundingSphere();
  _muGeo.set(key,g);return g;}
-let _msBase=null;const _msGeo=new Map();
-function mouseSkinGeo(fur){   // one seamless fur body for every mouse, recoloured per fur: colour = A·fur + B
- if(!_msBase){const D=MOUSE_SDF,dec=(s,T)=>{const b=Uint8Array.from(atob(s),c=>c.charCodeAt(0));return new T(b.buffer);};
+let _msBase=null;const _msGeo=new Map(),_msAll={};
+function mouseSkinGeo(fur,slim){const vk=slim&&window.MORPHS&&window.MORPHS.slimbody?'slim':'std';_msBase=_msAll[vk]||null;   // one seamless fur body for every mouse, recoloured per fur: colour = A·fur + B
+ if(!_msBase){const D=vk==='slim'?window.MORPHS.slimbody:MOUSE_SDF,dec=(s,T)=>{const b=Uint8Array.from(atob(s),c=>c.charCodeAt(0));return new T(b.buffer);};
   const p=dec(D.pos,Int16Array),n=dec(D.nor,Int8Array),A=dec(D.A,Uint8Array),B=dec(D.B,Uint8Array),si=dec(D.si,Uint8Array),sw=dec(D.sw,Uint8Array),N=D.v;
   const pos=new Float32Array(N*3),nor=new Float32Array(N*3),Bl=new Float32Array(N*3),Af=new Float32Array(N),ski=new Uint16Array(N*4),skw=new Float32Array(N*4);
   for(let i=0;i<N;i++){for(let c=0;c<3;c++){pos[i*3+c]=p[i*3+c]/1e4;nor[i*3+c]=n[i*3+c]/127;Bl[i*3+c]=Math.pow(B[i*3+c]/255,2.2);}Af[i]=A[i]/255;ski[i*4]=si[i*2];ski[i*4+1]=si[i*2+1];skw[i*4]=sw[i]/255;skw[i*4+1]=1-sw[i]/255;}
-  _msBase={N,Af,Bl,pos:new THREE.BufferAttribute(pos,3),nor:new THREE.BufferAttribute(nor,3),ski:new THREE.Uint16BufferAttribute(ski,4),skw:new THREE.BufferAttribute(skw,4),idx:new THREE.Uint16BufferAttribute(dec(D.idx,Uint16Array),1)};}
- let g=_msGeo.get(fur);if(g)return g;const b=_msBase,f=LC(fur),col=new Float32Array(b.N*3);
+  _msBase=_msAll[vk]={N,Af,Bl,pos:new THREE.BufferAttribute(pos,3),nor:new THREE.BufferAttribute(nor,3),ski:new THREE.Uint16BufferAttribute(ski,4),skw:new THREE.BufferAttribute(skw,4),idx:new THREE.Uint16BufferAttribute(dec(D.idx,Uint16Array),1)};}
+ let g=_msGeo.get(vk+fur);if(g)return g;const b=_msBase,f=LC(fur),col=new Float32Array(b.N*3);
  for(let i=0;i<b.N;i++){col[i*3]=b.Af[i]*f.r+b.Bl[i*3];col[i*3+1]=b.Af[i]*f.g+b.Bl[i*3+1];col[i*3+2]=b.Af[i]*f.b+b.Bl[i*3+2];}
  g=new THREE.BufferGeometry();g.setAttribute('position',b.pos);g.setAttribute('normal',b.nor);g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('skinIndex',b.ski);g.setAttribute('skinWeight',b.skw);g.setIndex(b.idx);g.computeBoundingSphere();
- _msGeo.set(fur,g);return g;}
+ _msGeo.set(vk+fur,g);return g;}
 const EYEMAT=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.06,metalness:.1});
 const mgeo=new Map();function partGeo(key,fn){let g=mgeo.get(key);if(!g){const v=new VB();fn(v);g=v.geometry();mgeo.set(key,g);}return g;}
 function pm(geo,mat){const m=new THREE.Mesh(geo,mat||MOUSEMAT);m.castShadow=true;return m;}
@@ -1656,7 +1662,7 @@ function makeMouse(o){
   // the head, snout, nose, teeth and ears are one seamless surface (see mouseSkinGeo); whiskers and hats are added here
   for(const s of[-1,1]){const em=TM(s*.24,.28,-.08,1,1,1,-.2,s*.45,-s*.5);
   // long fine whiskers in two segments, plus brow whiskers
-   if(U==='ironmask')continue;   // the closed helm hides the whiskers
+   if(U==='ironmask'||U==='raider'||U==='gas'||U==='flamer'||U==='heavy')continue;   // a mask, wrap or jaw guard hides the whiskers
    if(o.hat==='ironmask'){v.add(GB.torus,'#2c2d2a',em.clone().multiply(TM(0,-.27,0,.11,.11,.16,PI/2,0,0)));continue;}   // the helm hides the whiskers; a ring seals each ear
    for(let k=0;k<6;k++){const yy=-.06+(k%3-1)*.022,zz=.5-Math.floor(k/3)*.035;const ry=-s*(.05+k*.07),rz=s*((k%3)-1)*.14;v.add(GB.boxc,'#f4f0e8',TM(s*.2,yy,zz-.06,.34,.0045,.0045,0,ry,rz));v.add(GB.boxc,'#e6e0d4',TM(s*.42,yy+((k%3)-1)*.02,zz-.17,.2,.0035,.0035,0,ry*1.6,rz*1.4));}
    v.add(GB.boxc,'#efe9df',TM(s*.17,.16,.22,.2,.0035,.0035,0,-s*.4,s*.35));}
@@ -1688,7 +1694,7 @@ arms.push(a);}
 legs.push(l);}
  const tail=new THREE.Bone();tail.position.set(0,.74,-.34);body.add(tail);
  // the seamless fur body (head, snout, ears, hands, feet and tail), skinned to the parts above so it moves with them
- const skin_=new THREE.SkinnedMesh(mouseSkinGeo(fur),MOUSEMAT_SK);skin_.castShadow=true;g.add(skin_);
+ const skin_=new THREE.SkinnedMesh(mouseSkinGeo(fur,!!U&&SLEEKU.has(U)),MOUSEMAT_SK);skin_.castShadow=true;g.add(skin_);
  const cloth_=U?new THREE.SkinnedMesh(mouseUnitGeo(U,coat,trim,pants),MOUSEMAT_SK):null;if(cloth_){cloth_.castShadow=true;g.add(cloth_);}g.updateMatrixWorld(true);
  const skel_=new THREE.Skeleton([body,head,arms[0],arms[1],legs[0],legs[1],tail]);skin_.bind(skel_);if(cloth_)cloth_.bind(skel_);
  const vis={g,body,head,arms,legs,tail,musket:null,aimed:false,t:rr()*10,muzzleY:1.5};
@@ -2041,14 +2047,14 @@ function planShips(){let made=0,tries=0;while(made<8&&tries<3000){tries++;const 
 // ================= NPCS =================
 const NPCS=[];
 class NPC{
- constructor(o){Object.assign(this,o);this.hpMax=this.hp=o.hp||60;
+ constructor(o){Object.assign(this,o);this.hpMax=this.hp=o.hp||60;if(this.kind==='citizen'&&!this.still&&!o.apron&&rng()<.2){o=Object.assign({},o,{musket:true});this.armed=true;}   // one townsfolk in five carries a gun
   this.vis=makeMouse({fur:o.fur||pick(FURS),coat:o.coat,trim:o.trim,hat:o.hat,hatCol:o.hatCol,musket:o.musket,apron:o.apron,epaulettes:o.epaulettes,pants:o.pants,crossbelt:o.crossbelt,officer:o.officer,corps:o.corps,cuirass:o.cuirass,sash:o.sash});
   this.g=this.vis.g;this.pos=this.g.position;this.home={x:o.x,z:o.z};this.pos.set(o.x,groundAt(o.x,o.z),o.z);this.yaw=o.yaw!==undefined?o.yaw:rng()*TAU;this.g.rotation.y=this.yaw;
   this.tgt=null;this.wait=rng()*4;this.cool=1+rng()*3;this.dead=false;this.deadT=0;this.alert=false;scene.add(this.g);NPCS.push(this);}
- hostile(){if(this.dead)return false;if(this.kind==='bandit'||this.kind==='assassin'||this.kind==='pirate'||this.kind==='fang')return true;if((this.kind==='soldier'||this.kind==='guard')&&this.k>=0&&(atWar(P.army,this.k)||(P.rep&&P.rep[this.k]<-60&&!(P.army===this.k&&dressNow()==='army'))))return true;return false;}
+ hostile(){if(this.dead)return false;if(this.kind==='bandit'||this.kind==='assassin'||this.kind==='pirate'||this.kind==='fang')return true;if(this.angry)return true;if((this.kind==='soldier'||this.kind==='guard')&&this.k>=0&&(atWar(P.army,this.k)||heatOf(this.k)>0))return true;return false;}
  talkable(){return !this.dead&&!this.hostile()&&this.kind!=='bandit';}
  die(){if(this.reg&&!this.regGone)regLoss(this);this.dead=true;this.alert=false;this.deadT=this.kind==='bandit'?260:this.kind==='guard'?140:this.kind==='escort'?30:200;this.g.rotation.x=-PI/2;this.g.position.y+=.35;setAim(this.vis,false);if(this.reg)this.deadT=35;}
- respawn(){if(this.kind==='escort'||this.kind==='assassin'||this.battle||this.reg){this.remove();return;}this.dead=false;this.hp=this.hpMax;this.g.rotation.x=0;
+ respawn(){if(this.kind==='escort'||this.kind==='assassin'||this.battle||this.reg||this.hunter){this.remove();return;}this.angry=false;this.flee=0;this.crimeVictim=false;this.dead=false;this.hp=this.hpMax;this.g.rotation.x=0;
   if(this.kind==='soldier'&&this.k>=0&&!this.sky){const c=capitalOf(this.k);let x=c.x,z=c.z;for(let i=0;i<12;i++){const a=rr()*TAU,r=(c.grand?c.r*.3:c.r*.45)+rr()*10;const qx=c.x+Math.cos(a)*r,qz=c.z+Math.sin(a)*r;if(heightAt(qx,qz)>1){x=qx;z=qz;break;}}this.pos.set(x,groundAt(x,z),z);this.tgt={x:this.home.x,z:this.home.z};this.wait=0;return;}
   const x=this.home.x+(rr()-.5)*6,z=this.home.z+(rr()-.5)*6;this.pos.set(x,groundAt(x,z),z);this.tgt=null;}
  remove(){scene.remove(this.g);const i=NPCS.indexOf(this);if(i>=0)NPCS.splice(i,1);}
@@ -2068,6 +2074,8 @@ class NPC{
   let moveSpd=0,face=null;
   if(this.kind==='escort'){this.escortUpdate(dt,dx,dz,dP);return;}
   if(this.caravan){const C=this.caravan;const sd=this.side;const px=C.x+Math.cos(C.yaw)*sd*2.6-Math.sin(C.yaw)*(sd>0?-1.5:2),pz=C.z-Math.sin(C.yaw)*sd*2.6-Math.cos(C.yaw)*(sd>0?-1.5:2);const mv=Math.hypot(px-this.pos.x,pz-this.pos.z)/Math.max(dt,1e-3);this.pos.x=px;this.pos.z=pz;this.pos.y=groundAt(px,pz);this.yaw=C.yaw;if(this.talking>0){this.talking-=dt;}if(near){this.g.rotation.y=this.yaw;animMouse(this.vis,Math.min(mv,3),dt,'walk');}return;}
+  if(this.flee>0){this.flee-=dt;const fl=Math.hypot(dx,dz)||1;this.tgt={x:this.pos.x-dx/fl*12,z:this.pos.z-dz/fl*12};this.alert=false;if(near&&this.vis.aimed)setAim(this.vis,false);this.move(dt,4.6,null,near);return;}
+  if(this.angry){this.angryT-=dt;if(this.angryT<=0||dP>90){this.angry=false;this.alert=false;}}
   const hostile=this.hostile()&&(P.mode==='walk'||P.mode==='swim');
   if(hostile&&!this.alert&&dP<(this.kind==='guard'?30:42))this.alert=true;
   if(this.alert&&(!hostile||dP>80||(this.kind==='guard'&&Math.hypot(this.pos.x-this.home.x,this.pos.z-this.home.z)>50))){this.alert=false;this.tgt=null;}
@@ -2645,13 +2653,13 @@ function fire(){
  let best=null,bt=maxT;for(const n of NPCS){if(n.dead||!n.g.visible)continue;const cx=n.pos.x-o.x,cy=n.pos.y+1.05-o.y,cz=n.pos.z-o.z;const t=cx*d.x+cy*d.y+cz*d.z;if(t<(fpOn()?.4:camDist*.6)||t>bt)continue;const qx=cx-d.x*t,qy=cy-d.y*t,qz=cz-d.z*t;if(qx*qx+qz*qz<.36&&Math.abs(qy)<1.05){best=n;bt=t;}}
  let bw2=null;for(const w of WARB){if(w.dead)continue;const c=w.env();const oc=c.clone().sub(o);const t=oc.dot(d);if(t<0||t>Math.min(bt,190))continue;if(oc.clone().addScaledVector(d,-t).length()<6.5){bw2=w;bt=t;best=null;}}
  if(bw2){bw2.hostile()?hurtWarb(bw2,34):(P.warnT<=0&&(toast('That’s a friendly war balloon.','bad'),P.warnT=4));}
- const mz=fpOn()&&VM?VM.muzzle():muzzleOf(P.vis);const hit=o.clone().addScaledVector(d,bt);tracer(mz,hit);puff(mz,4);muzzleFlash(mz);sfxShot(.9);if(fpOn()&&VM){VM.kick=1;camPitch-=.03;}
- if(best){if(best.hostile()){hurtNPC(best,(38+rr()*14*(bt<70?1:.6))*WPN.dmg*(P.cls==='sharp'?1.15:1));if(WPN.id==='blunderbuss'){const hp2=o.clone().addScaledVector(d,bt);for(const n2 of NPCS){if(n2===best||n2.dead||!n2.hostile())continue;if(Math.hypot(n2.pos.x-hp2.x,n2.pos.z-hp2.z)<4)hurtNPC(n2,22);}}}else{best.talking=2;if(P.warnT<=0){toast(`${best.name} flinches. You won’t fire on peaceful folk.`,'bad');P.warnT=4;}}}else puff(hit,2);}
+ const mz=fpOn()&&VM?VM.muzzle():muzzleOf(P.vis);const hit=o.clone().addScaledVector(d,bt);if(WPN.flame){flameJet(mz,d,bt);puff(mz,2);}else{tracer(mz,hit);puff(mz,4);muzzleFlash(mz);}sfxShot(WPN.flame?.4:.9);if(fpOn()&&VM){VM.kick=1;camPitch-=.03;}
+ if(best){if(best.hostile()||crimeHit(best)){hurtNPC(best,(38+rr()*14*(bt<70?1:.6))*WPN.dmg*(P.cls==='sharp'?1.15:1));if(WPN.id==='blunderbuss'){const hp2=o.clone().addScaledVector(d,bt);for(const n2 of NPCS){if(n2===best||n2.dead||!n2.hostile())continue;if(Math.hypot(n2.pos.x-hp2.x,n2.pos.z-hp2.z)<4)hurtNPC(n2,22);}}}else{best.talking=2;if(P.warnT<=0){toast(`${best.name} flinches. You won’t fire on peaceful folk.`,'bad');P.warnT=4;}}}else puff(hit,2);}
 function melee(){if(state!=='play'||P.mode!=='walk'||P.melee>0)return;P.melee=.7;P.vis.swing=.35;const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);
- let best=null,bd=2.8;for(const n of NPCS){if(n.dead||!n.hostile())continue;const dx=n.pos.x-P.pos.x,dz=n.pos.z-P.pos.z,d=Math.hypot(dx,dz);if(d<bd&&(dx*fx+dz*fz)/d>.2){best=n;bd=d;}}
- if(best)hurtNPC(best,P.items.sabre?55:P.vis.musket?30:18);if(P.items.sabre)P.melee=.45;}
+ let best=null,bd=2.8;for(const n of NPCS){if(n.dead||n.kind==='escort')continue;const dx=n.pos.x-P.pos.x,dz=n.pos.z-P.pos.z,d=Math.hypot(dx,dz)-(n.hostile()?.6:0);if(d<bd&&(dx*fx+dz*fz)/Math.max(d,.1)>.2){best=n;bd=d;}}
+ if(best&&!best.hostile())crimeHit(best);if(best)hurtNPC(best,P.items.sabre?55:P.vis.musket?30:18);if(P.items.sabre)P.melee=.45;}
 function hurtNPC(n,dmg,quiet){if(quiet&&!n.dead&&n.hp-dmg<=0){n.hp=0;n.die();return;}if(n.dead)return;n.hp-=dmg;n.alert=true;n.cool=Math.min(n.cool,1.6);if(n.hp<=0){if(n.reg&&SHARED())wcmd('hit',{id:n.reg.id});n.die();onKill(n);}}
-function onKill(n){if(n.kind==='escort'||CINE.on)return;P.kills++;if(n.k>=0&&(n.kind==='guard'||n.kind==='soldier')&&!atWar(P.army,n.k)&&!n.battle)addCrime(n.k,'murder');skillXP('marksman',2);if(n.kind==='assassin'){news(`${P.name} cuts down an assassin sent to murder them!`,'gold');addRep(n.paidBy,-5);}if(n.k>=0&&(n.kind==='soldier'||n.kind==='guard'))addRep(n.k,atWar(P.army,n.k)?-2:-12);if(n.kind==='bandit'&&n.camp!==undefined&&CAMPS[n.camp])addRep(CAMPS[n.camp].k,1);if(n.kind==='fang'){const g=n.chief?600:Math.round(25+rr()*20);P.gold+=g;for(let k=0;k<4;k++)addRep(k,n.chief?6:1);toast(n.chief?'Mordecai Ironfang is defeated! The League rewards you with 600 gold.':`Iron Fang insurgent defeated. The League pays a ${g} gold bounty.`,'gold');if(n.chief)news(`${P.name} defeats Mordecai Ironfang, leader of the Iron Fang, on Fanghold Isle. The League of Kingdoms rejoices.`,'gold');}
+function onKill(n){if(n.kind==='escort'||CINE.on)return;P.kills++;if(n.crimeVictim){const ck=n.crimeK;if(ck>=0){raiseHeat(ck,1);if(!(n.kind==='guard'||n.kind==='soldier'))addCrime(ck,'killing');}crimeWitness(n,1.6);}if(n.k>=0&&(n.kind==='guard'||n.kind==='soldier')&&!atWar(P.army,n.k)&&!n.battle)addCrime(n.k,'murder');skillXP('marksman',2);if(n.kind==='assassin'){news(`${P.name} cuts down an assassin sent to murder them!`,'gold');addRep(n.paidBy,-5);}if(n.k>=0&&(n.kind==='soldier'||n.kind==='guard'))addRep(n.k,atWar(P.army,n.k)?-2:-12);if(n.kind==='bandit'&&n.camp!==undefined&&CAMPS[n.camp])addRep(CAMPS[n.camp].k,1);if(n.kind==='fang'){const g=n.chief?600:Math.round(25+rr()*20);P.gold+=g;for(let k=0;k<4;k++)addRep(k,n.chief?6:1);toast(n.chief?'Mordecai Ironfang is defeated! The League rewards you with 600 gold.':`Iron Fang insurgent defeated. The League pays a ${g} gold bounty.`,'gold');if(n.chief)news(`${P.name} defeats Mordecai Ironfang, leader of the Iron Fang, on Fanghold Isle. The League of Kingdoms rejoices.`,'gold');}
  if(n.kind==='pirate'){for(let k=0;k<4;k++)addRep(k,1);const g=Math.round(20+rr()*25);P.gold+=g;toast(`Pirate defeated. You find ${g} gold.`,'gold');if(n.captain){news(`Captain Rustclaw falls to ${P.name}!`,'gold');P.gold+=400;if((P.story||0)===4){toast('You find a ledger in the captain’s coat, full of payments to spies in every court…','gold');advanceStory();}}}
  if(n.kind==='bandit'){const g=Math.round(8+rr()*14);P.gold+=g;sfxCoin();toast(`Bandit defeated. You find ${g} gold on them.`,'gold');}
  else{const g=Math.round(5+rr()*8);P.gold+=g;if(P.army>=0)addMerit(1);toast(`${K[n.k].name} ${n.kind} defeated (+${g} gold${P.army>=0?', +1 merit':''}).`,'gold');if(P.mission&&P.mission.type==='skirmish'&&n.k===P.mission.rival)P.mission.prog++;}
@@ -2662,7 +2670,7 @@ function npcFire(n,d){n.vis.g.updateMatrixWorld(true);const mz=muzzleOf(n.vis);
  const chance=clamp(.5*(1-d/65),.08,.5);const tgt=P.pos.clone().add(new V3(0,1.1,0));
  if(rr()<chance){tracer(mz,tgt);hurtPlayer(9+rr()*7);}else{tgt.x+=(rr()-.5)*3;tgt.y+=(rr()-.5)*2;tgt.z+=(rr()-.5)*3;tracer(mz,tgt);}}
 function hurtPlayer(d){if(P.mode==='dead'||P.god)return;if(P.bless.resolve>0)d*=.6;d*=1-armourCut();P.hp-=d;$('hurt').style.boxShadow='inset 0 0 170px rgba(170,20,10,.75)';setTimeout(()=>{$('hurt').style.boxShadow='inset 0 0 160px rgba(170,20,10,0)';},180);P.hurtT=6;if(P.hp<=0)playerDie();}
-function playerDie(){P.hp=0;P.mode='dead';const lost=Math.floor(P.gold*.15);P.gold-=lost;let lc=0;for(const g in P.cargo){const l=Math.ceil(P.cargo[g]/2);P.cargo[g]-=l;lc+=l;if(!P.cargo[g])delete P.cargo[g];}
+function playerDie(){P.hp=0;P.mode='dead';if(P.heat&&P.heat.some(v=>v>0)){P.heat=[0,0,0,0];setTimeout(()=>toast('The state lets the matter rest. Your wanted stars are gone.'),2500);}const lost=Math.floor(P.gold*.15);P.gold-=lost;let lc=0;for(const g in P.cargo){const l=Math.ceil(P.cargo[g]/2);P.cargo[g]-=l;lc+=l;if(!P.cargo[g])delete P.cargo[g];}
  $('dtext').textContent=`You lost ${lost} gold${lc?` and ${lc} crates of cargo`:''}. A kindly mouse carried you to safety.`;$('death').classList.remove('hidden');releaseMouse();P.vis.g.rotation.x=-PI/2;}
 function respawn(){$('death').classList.add('hidden');let t=null;
  if(P.army>=0)t=capitalOf(P.army);else{let bd=1e9;for(const tt of TOWNS){if(!tt.inn)continue;const d=Math.hypot(tt.x-P.pos.x,tt.z-P.pos.z);if(d<bd){bd=d;t=tt;}}}
@@ -3350,7 +3358,7 @@ Return ONLY JSON: {"reply": string, "relation_change": integer from -5 to 5, "ac
 // ================= REPUTATION, SKILLS, WAR SCORE =================
 const WS=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];function addWS(a,b,n){if(a>=0&&b>=0&&a!==b)WS[a][b]+=n;}
 const UNITNAME={foot:'Infantry',horse:'Cavalry',guns:'Artillery'},UNITCOST={foot:4,horse:7,guns:9};
-function addRep(k,n){if(k===undefined||k<0||k>3)return;P.rep=P.rep||[0,0,0,0];const was=P.rep[k];P.rep[k]=clamp(was+n,-100,100);if(was>=-60&&P.rep[k]<-60)toast(`You are now an outlaw in ${K[k].name}. Its guards will attack you on sight.`,'bad');if(was<60&&P.rep[k]>=60)toast(`You are hailed as a hero of ${K[k].name}!`,'gold');}
+function addRep(k,n){if(k===undefined||k<0||k>3)return;P.rep=P.rep||[0,0,0,0];const was=P.rep[k];P.rep[k]=clamp(was+n,-100,100);if(was>=-60&&P.rep[k]<-60)toast(`Your name is mud in ${K[k].name}. Its people distrust you, but its guards only come for you when you are wanted.`,'bad');if(was<60&&P.rep[k]>=60)toast(`You are hailed as a hero of ${K[k].name}!`,'gold');}
 const repName=v=>v>=60?'Hero':v>=25?'Friend':v>=-10?'Known':v>=-60?'Disliked':'Outlaw';
 const SKILLS={marksman:'Marksmanship',diplomacy:'Diplomacy',trade:'Trading',sailing:'Sailing',leadership:'Leadership'};
 function skillLv(s){const xp=(P.skills&&P.skills[s])||0;return Math.min(10,Math.floor(Math.sqrt(xp/6)));}
@@ -3760,7 +3768,7 @@ function mapZoomInit(cv,vp){const apply=()=>{const W0=vp.clientWidth||640;MAPZ.z
  $('mzMe').onclick=()=>{const W0=vp.clientWidth||640;MAPZ.z=Math.max(MAPZ.z,3.5);const px=(P.pos.x+HALF)/W*W0*MAPZ.z,py=(P.pos.z+HALF)/W*W0*MAPZ.z;MAPZ.tx=W0/2-px;MAPZ.ty=W0/2-py;apply();};apply();}
 
 // ================= COURTS AND TRIALS =================
-const COURTS=[];const COURT={flag:null,k:0};const CRIMES={robbery:{n:'robbing the Royal Mint',sev:4},jailbreak:{n:'breaking out of jail',sev:3},murder:{n:'killing a guard',sev:3},smuggling:{n:'smuggling embargoed goods',sev:1},espionage:{n:'espionage',sev:2},resisting:{n:'resisting arrest',sev:2},bribery:{n:'bribing a judge',sev:2}};
+const COURTS=[];const COURT={flag:null,k:0};const CRIMES={robbery:{n:'robbing the Royal Mint',sev:4},jailbreak:{n:'breaking out of jail',sev:3},murder:{n:'killing a guard',sev:3},killing:{n:'killing a citizen',sev:2},assault:{n:'attacking a citizen',sev:1},smuggling:{n:'smuggling embargoed goods',sev:1},espionage:{n:'espionage',sev:2},resisting:{n:'resisting arrest',sev:2},bribery:{n:'bribing a judge',sev:2}};
 function addCrime(k,c){if(k===undefined||k<0||k>3)return;P.crimes=P.crimes||[[],[],[],[]];P.wanted=P.wanted||[0,0,0,0];P.crimes[k].push({c,d:Math.floor(gameTime)});P.wanted[k]=Math.min(10,P.wanted[k]+CRIMES[c].sev);toast(`⚖ You are now wanted in ${K[k].name} for ${CRIMES[c].n}.`,'bad');}
 function wantedLine(){const w=P.wanted||[0,0,0,0];const ks=[0,1,2,3].filter(k=>w[k]>0);return ks.length?'⚖ Wanted in '+ks.map(k=>K[k].name).join(', '):'';}
 function buildCourtRoom(cx,cz){const b=new VB(),wb=new VB();const w=34,d=30,h=12,oak='#6a4024',oakL='#8a5630',gold='#d9b24a',green='#2f5a3a';const R0={cx,cz,w,d,h,wall:'#e8dcc4',floor:oak,light:3.4,cam:10,noWin:true,spots:[],name:()=>`The Royal Court of ${K[COURT.k]?K[COURT.k].name:'the realm'}`,title:()=>`The Royal Court of ${K[COURT.k]?K[COURT.k].name:'the realm'}. Justice is done here in the name of the crown.`};roomShell(b,wb,R0);parquet(b,cx,cz,w,d,oak,oakL);
@@ -5234,7 +5242,7 @@ function adventureNear(){for(const Z of ZIPS)if(Math.hypot(P.pos.x-Z.a.x,P.pos.z
 
 // ================= WEAPONS AND ARMOUR =================
 const WEAPONS={musket:{id:'musket',n:'Service carbine',rel:.85,spr:.8,rng:200,dmg:1},rifle:{id:'rifle',n:'Bolt-action rifle',rel:1.05,spr:.4,rng:280,dmg:1.12},pistol:{id:'pistol',n:'Service revolver',rel:.38,spr:1.5,rng:80,dmg:.75},blunderbuss:{id:'blunderbuss',n:'Trench shotgun',rel:1.15,spr:2.8,rng:50,dmg:1.3},
- storm:{id:'storm',n:'Storm carbine',corps:'storm',rel:.55,spr:.7,rng:210,dmg:1.05},marksman:{id:'marksman',n:'Scoped marksman rifle',corps:'ironmask',rel:1.25,spr:.12,rng:380,dmg:1.55},tankgun:{id:'tankgun',n:'Anti-tank rifle',corps:'heavy',rel:2.3,spr:.3,rng:330,dmg:2.6},autopistol:{id:'autopistol',n:'Officer’s automatic pistol',corps:'officer',rel:.22,spr:1.3,rng:90,dmg:.72}};
+ storm:{id:'storm',n:'Storm carbine',corps:'storm',rel:.55,spr:.7,rng:210,dmg:1.05},marksman:{id:'marksman',n:'Scoped marksman rifle',corps:'ranger',rel:1.25,spr:.12,rng:380,dmg:1.55},tankgun:{id:'tankgun',n:'Anti-tank rifle',corps:'heavy',rel:2.3,spr:.3,rng:330,dmg:2.6},autopistol:{id:'autopistol',n:'Aviator’s automatic pistol',corps:'aviator',rel:.22,spr:1.3,rng:90,dmg:.72},trenchgun:{id:'trenchgun',n:'Pump trench gun with bayonet',corps:'raider',rel:.8,spr:2.3,rng:55,dmg:1.6},semiauto:{id:'semiauto',n:'Self-loading rifle',corps:'gas',rel:.45,spr:.45,rng:250,dmg:1.05},flamer:{id:'flamer',n:'Flamethrower',corps:'flamer',rel:.13,spr:1.6,rng:24,dmg:.6,flame:true},cavcarbine:{id:'cavcarbine',n:'Cavalry carbine',corps:'cuirassier',rel:.7,spr:.7,rng:180,dmg:1.05}};
 function ownedWeapons(){const o=[];if(P.army>=0&&CORPS[corpsNow()].gun)o.push(CORPS[corpsNow()].gun);if(P.items.musket||P.army>=0)o.push('musket');if(P.items.rifle)o.push('rifle');if(P.items.pistol)o.push('pistol');if(P.items.blunderbuss)o.push('blunderbuss');return o;}
 function curWeapon(){const o=ownedWeapons();if(!P.weapon||!o.includes(P.weapon))P.weapon=(P.army>=0&&CORPS[corpsNow()].gun&&o.includes(CORPS[corpsNow()].gun))?CORPS[corpsNow()].gun:o.includes('rifle')?'rifle':o[0]||'musket';return WEAPONS[P.weapon];}
 function cycleWeapon(){const o=ownedWeapons();if(o.length<2){toast(o.length?`You only carry a ${WEAPONS[o[0]].n.toLowerCase()}.`:'You carry no firearms.');return;}const i=o.indexOf(curWeapon().id);P.weapon=o[(i+1)%o.length];outfit();toast(`You ready your ${WEAPONS[P.weapon].n.toLowerCase()}.`);}
@@ -5560,10 +5568,10 @@ function gunSpot(R,g){const D=divOf(R);const n=Math.max(1,R.sol?R.sol.length:R.s
 
 // ---- bringing a company to life near the player, and putting it away again
 const MATR=190,DEMATR=240,MATCAP=150;
-function soldierLook(R,i){const ty=regTy(R),kk=K[R.k],off=i===0;const o={coat:kk.coat,trim:kk.trim,hat:kk.hat,pants:'#e9e2d2',crossbelt:!off,epaulettes:off,officer:off,musket:true};
- if(ty==='foot'){if(R.div==='grenadier')o.hat='furcap';else if(R.div==='light')o.hat='tricorn';else if(R.div==='guard'){o.hat='shako';o.sash=kk.trim;}else if(R.div==='shock'&&!off){o.corps='storm';}}
- else if(ty==='horse'){o.coat=shadeHex(kk.coat,.85);if(R.div==='hussar'){o.hat='shako';o.sash='#d9b24a';o.musket=off;}else if(R.div==='cuirassier'){o.cuirass=true;o.hat='stahlhelm';o.musket=off;}else{o.hat='tricorn';}}
- else{if(!off){o.corps='heavy';o.musket=false;o.crossbelt=false;}}
+function soldierLook(R,i){const ty=regTy(R),kk=K[R.k],off=i===0;const o={coat:kk.coat,trim:kk.trim,hat:'stahlhelm',pants:shadeHex(kk.coat,.72),musket:true,epaulettes:off,officer:off};
+ if(ty==='foot')o.corps={shock:'storm',grenadier:'heavy',light:R.k===0?'ranger':'raider',guard:'gas'}[R.div]||'line';
+ else if(ty==='horse'){o.corps='cuirassier';o.musket=off;}
+ else{o.corps='heavy';o.musket=off;}
  return o;}
 function regSpawn(R,i,fromHome){const D=divOf(R);const s=regSlot(R,i);let x=s.x,z=s.z;if(fromHome){const t=TOWNS[R.home]||capitalOf(R.k);const a=rr()*TAU;x=t.x+Math.cos(a)*t.r*.5;z=t.z+Math.sin(a)*t.r*.5;}
  const L=soldierLook(R,i);const off=i===0&&R.cmd;
@@ -5763,7 +5771,9 @@ function fireIgnite(t,h){if(!t||!t.hs||!t.hs.length)return;if(!h){const live=t.h
 function fireBuild(h){const fm=new THREE.SpriteMaterial({map:flameTex(),color:0xffffff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});const y=heightAt(h.x,h.z);const W0=h.big?8:6;for(let i=0;i<11;i++){const s=new THREE.Sprite(fm);s.position.set(h.x+(rr()-.5)*W0,y+2.5+rr()*6.5,h.z+(rr()-.5)*W0);s.userData.b=s.position.clone();s.userData.ph=rr()*9;scene.add(s);h.burn.sp.push(s);}h.burn.glow=addGlow(h.x,y+5,h.z,22,0xff7a2a,'fire');}
 function fireDrop(h){if(!h.burn)return;for(const s of h.burn.sp)scene.remove(s);h.burn.sp=[];if(h.burn.glow){scene.remove(h.burn.glow);const i=GLOWS.findIndex(g=>g.sp===h.burn.glow);if(i>=0)GLOWS.splice(i,1);h.burn.glow=null;}}
 let FIRET=0;
-function townFireTick(dt){smokeTick(dt);FIRET-=dt;const slow=FIRET<=0;if(slow)FIRET=.25;
+const FLJ=[];function flameJet(o,d,len){const m=new THREE.SpriteMaterial({map:flameTex(),color:0xffffff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});for(let i=0;i<7;i++){const s=new THREE.Sprite(m);s.position.copy(o);s.scale.set(.6,.6,1);scene.add(s);FLJ.push({s,v:d.clone().multiplyScalar(26+rr()*10).add(new V3((rr()-.5)*2,(rr()-.2)*2,(rr()-.5)*2)),t:0,life:Math.min(.9,len/30)*(.7+rr()*.3),del:i*.03});}}
+function flameTick(dt){heatTick(dt);for(let i=FLJ.length-1;i>=0;i--){const f=FLJ[i];if(f.del>0){f.del-=dt;f.s.visible=false;continue;}f.s.visible=true;f.t+=dt;f.s.position.addScaledVector(f.v,dt);f.v.y+=3*dt;const a=f.t/f.life;const sc=.6+a*3.2;f.s.scale.set(sc,sc*1.3,1);f.s.material.opacity=Math.max(0,1-a);if(a>=1){scene.remove(f.s);FLJ.splice(i,1);if(rr()<.3)smokeEmit(f.s.position.x,f.s.position.y,f.s.position.z,true,.6);}}}
+function townFireTick(dt){smokeTick(dt);flameTick(dt);FIRET-=dt;const slow=FIRET<=0;if(slow)FIRET=.25;
  for(let i=FIREH.length-1;i>=0;i--){const h=FIREH[i];const B=h.burn;if(!B){FIREH.splice(i,1);continue;}B.t+=dt;const near=Math.hypot(h.x-P.pos.x,h.z-P.pos.z)<900&&!P.inside;
   if(near&&!B.sp.length)fireBuild(h);if(!near&&B.sp.length)fireDrop(h);
   const k=Math.min(1,B.t/12)*(B.t>B.dur-10?Math.max(0,(B.dur-B.t)/10):1);
@@ -5794,7 +5804,32 @@ function horseBodyGeo(c,m,tack){const key=c+m+(tack||'');if(_HB[key])return _HB[
   b.add(GB.boxc,'#2a1a10',TM(0,3.3,2.5,.36,.04,.04));b.add(GB.boxc,'#2a1a10',TM(0,3.0,1.7,.04,.04,1.4,-.45,0,0));}
  return _HB[key]=b.geometry();}
 function horseLegGeo(c){if(_HL[c])return _HL[c];const b=new VB();const cd=shadeHex(c,.85);b.add(GB.sphm,c,TM(0,-.1,0,.22,.42,.28),cd);b.add(GB.tcyl,c,TM(0,-1.05,0,.15,.9,.17,PI,0,0),cd);b.add(GB.sphs,cd,TM(0,-1.12,0,.13));b.add(GB.tcyl,cd,TM(0,-1.12,0,.1,.78,.11,PI,0,0));b.add(GB.cyl,'#e8e2d6',TM(0,-1.95,0,.13,.12,.13));b.add(GB.cyl,'#1a1410',TM(0,-2.05,0,.14,.12,.15));return _HL[c]=b.geometry();}
-function makeHorse(ci,tack){const C=HCOATS[(ci||0)%HCOATS.length];const g=new THREE.Group();const body=new THREE.Mesh(horseBodyGeo(C[0],C[1],tack),MOUSEMAT);body.castShadow=true;g.add(body);const legs=[];
+
+// one smooth horse: body, neck, head, mane, tail and legs in a single skinned mesh (Morph Studio bake); coat and mane colours applied per horse
+const _HSG=new Map();let _HSB=null;
+function horseSkinGeo(c,m){const key=c+m;let g=_HSG.get(key);if(g)return g;
+ if(!_HSB){const D=window.MORPHS.horse,dec=(s,T)=>{const x=Uint8Array.from(atob(s),ch=>ch.charCodeAt(0));return new T(x.buffer);};
+  const p=dec(D.pos,Int16Array),n=dec(D.nor,Int8Array),A=dec(D.A,Uint8Array),B=dec(D.B,Uint8Array),si=dec(D.si,Uint8Array),sw=dec(D.sw,Uint8Array),N=D.v;
+  const pos=new Float32Array(N*3),nor=new Float32Array(N*3),Bl=new Float32Array(N*3),reg=new Uint8Array(N),ski=new Uint16Array(N*4),skw=new Float32Array(N*4);
+  for(let i=0;i<N;i++){for(let c2=0;c2<3;c2++){pos[i*3+c2]=p[i*3+c2]/5e3;nor[i*3+c2]=n[i*3+c2]/127;Bl[i*3+c2]=Math.pow(B[i*3+c2]/255,2.2);}reg[i]=Math.round(A[i]/60);ski[i*4]=si[i*2];ski[i*4+1]=si[i*2+1];skw[i*4]=sw[i]/255;skw[i*4+1]=1-sw[i]/255;}
+  _HSB={N,reg,Bl,pos:new THREE.BufferAttribute(pos,3),nor:new THREE.BufferAttribute(nor,3),ski:new THREE.Uint16BufferAttribute(ski,4),skw:new THREE.BufferAttribute(skw,4),idx:new THREE.Uint16BufferAttribute(dec(D.idx,Uint16Array),1)};}
+ const b=_HSB,cs=[null,LC(c),LC(m)],col=new Float32Array(b.N*3);
+ for(let i=0;i<b.N;i++){const cc=cs[b.reg[i]];if(cc){const k=b.Bl[i*3];col[i*3]=cc.r*k;col[i*3+1]=cc.g*k;col[i*3+2]=cc.b*k;}else{col[i*3]=b.Bl[i*3];col[i*3+1]=b.Bl[i*3+1];col[i*3+2]=b.Bl[i*3+2];}}
+ g=new THREE.BufferGeometry();g.setAttribute('position',b.pos);g.setAttribute('normal',b.nor);g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('skinIndex',b.ski);g.setAttribute('skinWeight',b.skw);g.setIndex(b.idx);g.computeBoundingSphere();
+ _HSG.set(key,g);return g;}
+const _HT={};
+function horseTackGeo(tack){if(_HT[tack])return _HT[tack];const b=new VB();const sad=tack==='royal'?'#6b1e2e':'#4a2a18';
+ b.add(GB.box,tack==='royal'?'#d9b24a':'#2a3a5a',TM(0,2.88,-.15,1.12,.05,1.3));b.add(GB.box,sad,TM(0,2.93,-.15,.9,.16,.95));b.add(GB.box,sad,TM(0,3.12,-.6,.84,.15,.13));b.add(GB.box,sad,TM(0,3.12,.26,.46,.2,.11));
+ for(const s2 of[-1,1]){b.add(GB.box,'#2a2622',TM(s2*.56,2.4,-.1,.035,.66,.035));b.add(GB.box,'#8a8a8a',TM(s2*.56,2.06,-.1,.15,.045,.11));b.add(GB.boxc,'#2a1a10',TM(s2*.2,3.25,2.7,.025,.025,.62));}
+ b.add(GB.boxc,'#2a1a10',TM(0,3.32,2.48,.34,.035,.035));b.add(GB.boxc,'#2a1a10',TM(0,3.0,1.7,.035,.035,1.3,-.45,0,0));
+ return _HT[tack]=b.geometry();}
+function makeHorse(ci,tack){if(!window.MORPHS||!window.MORPHS.horse)return makeHorseOld(ci,tack);const C=HCOATS[(ci||0)%HCOATS.length];
+ const g=new THREE.Group(),root=new THREE.Bone();g.add(root);const legs=[];
+ for(const[x,z]of[[-.3,1.0],[.3,1.0],[-.3,-1.0],[.3,-1.0]]){const l=new THREE.Bone();l.position.set(x,2.05,z);root.add(l);legs.push(l);}
+ const mesh=new THREE.SkinnedMesh(horseSkinGeo(C[0],C[1]),MOUSEMAT_SK);mesh.castShadow=true;g.add(mesh);g.updateMatrixWorld(true);mesh.bind(new THREE.Skeleton([root,...legs]));
+ if(tack!=='bare'){const t=new THREE.Mesh(horseTackGeo(tack||'plain'),MOUSEMAT);t.castShadow=true;root.add(t);}
+ return{g,body:root,legs,t:Math.random()*9};}
+function makeHorseOld(ci,tack){const C=HCOATS[(ci||0)%HCOATS.length];const g=new THREE.Group();const body=new THREE.Mesh(horseBodyGeo(C[0],C[1],tack),MOUSEMAT);body.castShadow=true;g.add(body);const legs=[];
  for(const[x,z]of[[-.3,1.0],[.3,1.0],[-.3,-1.0],[.3,-1.0]]){const p=new THREE.Group();p.position.set(x,2.05,z);const m=new THREE.Mesh(horseLegGeo(C[0]),MOUSEMAT);m.castShadow=true;p.add(m);g.add(p);legs.push(p);}
  return{g,body,legs,t:Math.random()*9};}
 // walk / trot / gallop: front and back legs swing in a diagonal rhythm that quickens with speed
@@ -5904,6 +5939,37 @@ function wGov(k,a,x,y){if(!SHARED())return false;const j=+x;const send=o=>{wcmd(
  return false;}
 window.AOC_WORLD={state:wApplyState,regs:wApplyRegs,news:wNews,win:wWin,get on(){return SHARED();}};
 
+
+// ================= WANTED BY THE STATE: stars, pursuit, armed townsfolk =================
+const heatOf=k=>(P.heat&&k>=0&&k<4)?P.heat[k]:0;
+function territoryAt(x,z){let best=-1,bd=900;for(const t of TOWNS){if(t.k<0&&t.occ===undefined)continue;const d=Math.hypot(t.x-x,t.z-z)-t.r;if(d<bd){bd=d;best=ownerT(t);}}return best;}
+function raiseHeat(k,n){if(k<0||k>3)return;P.heat=P.heat||[0,0,0,0];P.heatCool=P.heatCool||[0,0,0,0];const was=P.heat[k];P.heat[k]=Math.min(5,was+n);P.heatCool[k]=0;if(P.heat[k]>was)toast(`${'★'.repeat(P.heat[k])} Wanted by ${K[k].name}!`,'bad');wantedHud(true);}
+function crimeWitness(n,f){const r=45*(f||1);for(const o of NPCS){if(o===n||o.dead||o.reg)continue;const d=Math.hypot(o.pos.x-n.pos.x,o.pos.z-n.pos.z);if(d>r)continue;
+  if(o.kind==='citizen'||o.kind==='pilgrim'){if(o.armed&&rr()<.6){o.angry=true;o.angryT=45+rr()*30;o.alert=true;}else o.flee=6+rr()*5;}
+  else if((o.kind==='guard'||o.kind==='soldier')&&o.k===n.crimeK)o.alert=true;}}
+// returns true when the attack may go ahead (anyone but your own escort)
+function crimeHit(n){if(!n||n.dead||n.kind==='escort'||CINE.on)return false;
+ const uni=n.kind==='soldier'||n.kind==='guard';const k=n.k>=0&&n.k<4&&(uni||n.k===territoryAt(n.pos.x,n.pos.z))?n.k:territoryAt(n.pos.x,n.pos.z);
+ n.crimeVictim=true;n.crimeK=k;
+ if(k>=0&&!(uni&&atWar(P.army,k))&&!n.hostile()){raiseHeat(k,uni?2:1);if(!uni&&!n.hit0){n.hit0=true;addCrime(k,'assault');}}
+ if(!uni){if(n.armed){n.angry=true;n.angryT=60;n.alert=true;}else n.flee=8;}
+ crimeWitness(n,1);return true;}
+let HEATT=0,HUNTT=0;
+function heatTick(dt){if(!P.heat||state!=='play')return;HEATT-=dt;HUNTT-=dt;P.heatCool=P.heatCool||[0,0,0,0];
+ for(let k=0;k<4;k++){if(!(P.heat[k]>0))continue;
+  let seen=false;for(const n of NPCS){if(n.dead||n.k!==k||!(n.kind==='guard'||n.kind==='soldier'))continue;if(Math.abs(n.pos.x-P.pos.x)+Math.abs(n.pos.z-P.pos.z)<90&&!P.inside){seen=true;break;}}
+  if(seen)P.heatCool[k]=0;else{P.heatCool[k]+=dt;if(P.heatCool[k]>18){P.heatCool[k]=0;P.heat[k]--;if(!P.heat[k])toast(`You have shaken off the ${K[k].name} watch. You are no longer wanted.`,'gold');wantedHud(true);}}
+  // the watch sends hunters after you while you stay in its lands
+  if(P.heat[k]>=2&&HUNTT<=0&&!P.inside&&territoryAt(P.pos.x,P.pos.z)===k){const alive=NPCS.filter(n=>n.hunter&&!n.dead&&n.k===k).length;
+   if(alive<P.heat[k]*2){const m=1+Math.floor(P.heat[k]/2);for(let i=0;i<m;i++){const a=rr()*TAU,r=65+rr()*20;const x=P.pos.x+Math.cos(a)*r,z=P.pos.z+Math.sin(a)*r;if(heightAt(x,z)<.6)continue;
+     const kk=K[k];const h=new NPC({kind:'guard',k,x,z,name:pick(FIRST)+' of the Watch',title:kk.name+' Watch',coat:kk.coat,trim:kk.trim,pants:shadeHex(kk.coat,.72),corps:P.heat[k]>=4?'storm':'line',hat:'stahlhelm',musket:true,hp:70+P.heat[k]*10,hunter:true});h.alert=true;}
+    toast(`The ${K[k].name} watch sends more soldiers after you!`,'bad');}}}
+ if(HUNTT<=0)HUNTT=Math.max(9,32-Math.max(...P.heat)*5);
+ for(const n of NPCS)if(n.hunter&&!n.dead){if(heatOf(n.k)>0)n.home={x:P.pos.x,z:P.pos.z};else if(Math.hypot(n.pos.x-P.pos.x,n.pos.z-P.pos.z)>60)n.remove();}
+ if(HEATT<=0){HEATT=.5;wantedHud();}}
+function wantedHud(force){let d=document.getElementById('wantedHud');const w=P.heat||[0,0,0,0];const ks=[0,1,2,3].filter(k=>w[k]>0);
+ if(!d){if(!ks.length)return;d=document.createElement('div');d.id='wantedHud';d.style.cssText='position:fixed;top:58px;right:14px;z-index:30;font:600 15px system-ui;color:#ffd34a;text-shadow:0 1px 3px #000,0 0 6px #000;text-align:right;pointer-events:none;line-height:1.5';document.body.appendChild(d);}
+ d.innerHTML=ks.map(k=>`<div>${'★'.repeat(w[k])}<span style="opacity:.35">${'★'.repeat(5-w[k])}</span> ${esc(K[k].name)}</div>`).join('');d.style.display=ks.length&&state==='play'?'':'none';}
 // ================= THE ASSEMBLY OF CROWNS: WINGS =================
 function backSpot(R0,x,z,yaw,key,lab){R0.arrive={x,z,yaw};R0.entry={x,z};R0.exit={x:x,z:z-9999};R0.spots.push({x,z:z+(yaw===PI?1.8:-1.8),label:lab||'Return to the Assembly chamber',type:'goroom',key:key||'assembly'});}
 const MFAV=[0,0,0,0];

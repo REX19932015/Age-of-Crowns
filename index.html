@@ -2683,7 +2683,7 @@ function respawn(){$('death').classList.add('hidden');let t=null;
 function drinkTonic(){if(!P.items.tonic){toast('No healing tonics left. Merchants sell them.');return;}if(P.hp>=100){toast('You’re already in fine health.');return;}P.items.tonic--;P.hp=Math.min(100,P.hp+55);toast('You drink a healing tonic.','good');}
 
 // ================= MISSIONS / ECONOMY =================
-function addMerit(n){if(P.army<0)return;n=Math.round(n*(GOV.proj[P.army]&&GOV.proj[P.army].academy?1.5:1));P.merit+=n;while(P.ruler<0&&P.rank<WARRANT_R&&P.merit>=RANKS[P.rank+1].m){P.rank++;sfxChime();toast(`Promoted to ${RANKS[P.rank].n} of the ${K[P.army].name} Army!${P.rank===WARRANT_R?' That is the highest rank merit can earn; officers are appointed by the realm’s admins, and you may now volunteer for the Storm Troopers at any barracks.':''}`,'gold');outfit();}}
+function addMerit(n){if(P.army<0)return;n=Math.round(n*(GOV.proj[P.army]&&GOV.proj[P.army].academy?1.5:1));P.merit+=n;const mcap=window.AOC_HOOK&&window.AOC_HOOK.online?3:WARRANT_R;while(P.ruler<0&&P.rank<mcap&&P.merit>=RANKS[P.rank+1].m){P.rank++;sfxChime();toast(`Promoted to ${RANKS[P.rank].n} of the ${K[P.army].name} Army!${P.rank===mcap?(mcap===3?' That is the highest rank merit can earn. From Sergeant up, your officers promote you (Army tab, press full stop).':' That is the highest rank merit can earn; officers are appointed by the realm’s admins.'):''}`,'gold');outfit();}}
 function setMission(m){P.mission=m;toast(`New task: ${m.title}`,'gold');}
 function completeMission(){const m=P.mission;P.mission=null;if(m.k>=0)addRep(m.k,3);if(m.type==='govtour'&&P.gov.k>=0)addRep(P.gov.k,2);P.gold+=m.reward;sfxCoin();toast(`Task complete: ${m.title}. +${m.reward} gold${m.merit&&P.army>=0?`, +${m.merit} merit`:''}`,'gold');if(m.merit&&P.army>=0&&m.k===P.army)addMerit(m.merit);save();}
 function checkMission(){const m=P.mission;if(!m)return;
@@ -5844,8 +5844,8 @@ function horseAnim(H,spd,dt){H.t+=dt*(1.5+spd*.75);const s=H.t;const amp=spd<.3?
 
 // ================= PLAYERS IN NPC COMPANIES =================
 function myCompany(){if(P.company==null)return null;const R=REGS.find(r=>r.id===P.company);if(!R||R.k!==P.army){P.company=null;return null;}return R;}
-function joinCompany(R){if(P.army!==R.k){toast(`Only soldiers of ${K[R.k].name} can serve in the ${R.name}.`);return;}P.company=R.id;toast(`You join the ${R.name}. When it fights near you, you share in the pay and the glory.`,'gold');save();}
-function leaveCompany(){const R=myCompany();P.company=null;if(R)toast(`You leave the ${R.name}.`);save();}
+function joinCompany(R){if(P.army!==R.k){toast(`Only soldiers of ${K[R.k].name} can serve in the ${R.name}.`);return;}if(typeof SHARED==='function'&&SHARED()){wcmd('join',{id:R.id});return;}P.company=R.id;toast(`You join the ${R.name}. When it fights near you, you share in the pay and the glory.`,'gold');save();}
+function leaveCompany(){if(typeof SHARED==='function'&&SHARED()){wcmd('leave');return;}const R=myCompany();P.company=null;if(R)toast(`You leave the ${R.name}.`);save();}
 function rejoinCompany(){const R=myCompany();if(!R)return;if(P.inside||P.mode!=='walk'){toast('Step outside on foot first.');return;}if(R.busy||R.rout){toast('Your company is fighting. Make your own way there!');return;}if(NPCS.some(n=>n.alert&&!n.dead&&n.hostile()&&Math.hypot(n.pos.x-P.pos.x,n.pos.z-P.pos.z)<60)){toast('Not while enemies are on you.');return;}
  const s=regSlot(R,Math.max(1,Math.round(R.str)));P.pos.set(s.x,groundAt(s.x,s.z),s.z);P.snapCam=true;toast(`You fall in with the ${R.name}.`,'gold');}
 let _chud=null,_chudT=0;
@@ -5943,7 +5943,10 @@ function wGov(k,a,x,y){if(!SHARED())return false;const j=+x;const send=o=>{wcmd(
  if(a==='recruit'||a==='fest')return send({a});
  if(['take','give','dec','embargo','meet','woo','snap','armylvl','balloon'].includes(a)){toast('In the shared realm this is not available yet. Taxes, laws, great works, gifts, war, peace and alliances are.');return true;}
  return false;}
-window.AOC_WORLD={state:wApplyState,regs:wApplyRegs,news:wNews,win:wWin,get on(){return SHARED();}};
+// company rosters and squads come from the server; this browser only follows them
+function wRoster(m){if(!SHARED()||!m||!m.me)return;const was=P.company;P.company=m.me.co;if(was!==P.company&&document.getElementById('stratMap'))try{openStrategy();}catch(e){}}
+function wCompanies(k){return REGS.filter(r=>r.k===k).map(r=>({id:r.id,name:r.name,type:r.type,str:r.str,div:divOf(r).n}));}
+window.AOC_WORLD={state:wApplyState,regs:wApplyRegs,news:wNews,win:wWin,roster:wRoster,companies:wCompanies,get on(){return SHARED();}};
 
 
 // ================= WANTED BY THE STATE: stars, pursuit, armed townsfolk =================

@@ -486,6 +486,12 @@ module.exports = function makeWorld(ctx) {
         const myK = S.mil ? S.mil.army : -1; if (myK === R.k) return; if (myK >= 0 && !atWar(myK, R.k)) return; casualty(R, 1); if (R.str <= FIELD[R.type].size * .3 || R.mor < 18) rout(R, null); return;
       }
       if (op === 'gov') return govCmd(S, m);
+      if (op === 'time') { // an admin sets the hour of the day for the whole realm
+        if (!S.admin) return err(S, 'Only the realm\'s admins can change the time of day for everyone.');
+        const hr = Math.round(+m.hr); if (!(hr >= 0 && hr < 24)) return;
+        W.t = Math.floor(W.t) + hr / 24 + (hr === 0 ? 1 : 0); lastDay = Math.floor(W.t); dirty = true; broadcastState();
+        return toast(S, `The realm's clock is set to ${String(hr).padStart(2, '0')}:00 for every player.`, 'gold');
+      }
       if (op === 'rebuild') { // a patron pays from their own purse; the gold is taken here, never in the browser
         const t = TOWNS[Math.round(+m.town)]; if (!t || !(W.ruin[t.i] > 0)) return err(S, 'That town has nothing to rebuild.');
         if (!Number.isFinite(S.x) || Math.hypot(S.x - t.x, S.z - t.z) > t.r + 120) return err(S, `Go to ${t.name} first.`);

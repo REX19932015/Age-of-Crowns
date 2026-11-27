@@ -188,7 +188,7 @@ function cleanBag(o, maxKeys = 200) {
   }
   return out;
 }
-const LOOK_KEYS = ['fur', 'coat', 'trim', 'pants', 'hat', 'hatCol', 'size', 'civvies', 'dress', 'royal', 'epaulettes', 'apron', 'crossbelt', 'cape', 'ruler', 'sash', 'cuirass', 'officer', 'musket', 'gun', 'queen', 'corps'];
+const LOOK_KEYS = ['fur', 'coat', 'trim', 'pants', 'hat', 'hatCol', 'size', 'civvies', 'dress', 'royal', 'epaulettes', 'apron', 'crossbelt', 'cape', 'ruler', 'sash', 'cuirass', 'officer', 'musket', 'gun', 'queen', 'corps', 'scarf', 'bag', 'glasses', 'feather', 'earring'];
 function cleanLook(o) {
   const out = {};
   if (!o || typeof o !== 'object') return out;

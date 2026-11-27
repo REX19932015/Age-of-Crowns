@@ -1644,10 +1644,43 @@ function corpsBody(v,c,coat){const lea='#4a3222',leaD='#2e1e14',gm='#3b3c38';
  if(c==='heavy'){const hm='#4b4f45',hd='#25271f';v.add(GB.sph,hm,TM(0,1.05,.08,.47,.38,.43),'#33362f');      // banded heavy armour
   for(const y of[.86,.99,1.12,1.25])v.add(GB.boxc,hd,TM(0,y,.47,.56,.022,.05));for(const s of[-1,1]){v.add(GB.sph,hm,TM(s*.38,1.4,0,.2,.12,.2),'#33362f');v.add(GB.sphs,hd,TM(s*.24,1.3,.36,.03));}}
  if(c==='officer'){v.add(GB.tcyl,coat,TM(0,.3,0,.45,.55,.41),shadeHex(coat,.7));v.add(GB.boxc,leaD,TM(0,1.1,.33,.06,.82,.025,0,0,.6));v.add(GB.boxc,leaD,TM(-.43,.72,.12,.08,.22,.15,.25,0,0));v.add(GB.sphs,'#b8913e',TM(-.47,.8,.16,.02));}}
+// ================= RANK PINS ON THE UNIFORM =================
+// o.rk is the wearer's army rank (the server sets it for other players). Every soldier wears rank pins that match
+// the rank chart: a badge on the left breast and a small pin on each collar point. Recruit and Private share a plain button.
+const RK_GOLD='#e9c25a',RK_DARK='#5a3d0c',RK_BRONZE='#b0743a',RK_RED='#c0303a';
+function rkOf(o){const r=o&&o.rk!==undefined&&o.rk!==null&&o.rk!==''?+o.rk:-1;return Number.isFinite(r)?r:-1;}
+// one pin, drawn in the x-y plane facing forward (+z) at (x,y,z); k scales it
+function rankPin(v,r,x,y,z,k){
+ const S=a=>a*k,G=RK_GOLD,T=S(.014);
+ const bar=(cx,cy,len,ang)=>v.add(GB.boxc,G,TM(cx,cy,z,S(len),S(.017),T,0,0,ang),RK_DARK);
+ const chev=cy=>{for(const d of[-1,1])bar(x+d*S(.026),cy+S(.012),.064,-d*.6);};        // points down, like the chart
+ const rocker=cy=>{bar(x-S(.034),cy,.05,.35);bar(x+S(.034),cy,.05,-.35);bar(x,cy-S(.01),.03,0);};
+ const star=(cx,cy,s=1)=>{v.add(GB.sphs,G,TM(cx,cy,z+S(.004),S(.016*s)));for(let i=0;i<4;i++)v.add(GB.boxc,G,TM(cx,cy,z,S(.06*s),S(.013*s),T,0,0,i*Math.PI/4),RK_DARK);};
+ const crown=(cx,cy,s=1)=>{v.add(GB.boxc,G,TM(cx,cy-S(.022*s),z,S(.075*s),S(.02*s),T),RK_DARK);for(const d of[-1,0,1])v.add(GB.cone8,G,TM(cx+d*S(.028*s),cy+S(.008*s),z,S(.013*s),S(.042*s),S(.01*s)));v.add(GB.sphs,RK_RED,TM(cx,cy-S(.022*s),z+S(.007),S(.009*s)));};
+ if(r<=1){v.add(GB.sphs,RK_BRONZE,TM(x,y,z,S(.028)));v.add(GB.sphs,shadeHex(RK_BRONZE,.7),TM(x,y,z+S(.01),S(.012)));return;}
+ if(r<=5){const n=r===2?1:r===3?2:3;const top=y+(n-1)*S(.019)+(r===5?S(.016):0);for(let i=0;i<n;i++)chev(top-i*S(.038));if(r===5)rocker(top-n*S(.038)-S(.004));return;}
+ if(r===6){v.add(GB.torus,G,TM(x,y,z,S(.055),S(.055),S(.03)));crown(x,y+S(.004),.8);return;}
+ if(r===7){star(x,y+S(.03));star(x,y-S(.03));return;}
+ if(r===8){star(x,y+S(.048),.85);star(x,y,.85);star(x,y-S(.048),.85);return;}
+ if(r===9)return crown(x,y,1.25);
+ if(r===10){crown(x,y+S(.036));star(x-S(.028),y-S(.038),.7);star(x+S(.028),y-S(.038),.7);return;}
+ // General: crossed swords under a crown
+ for(const d of[-1,1]){v.add(GB.boxc,'#dfe3e8',TM(x,y-S(.012),z,S(.012),S(.11),T,0,0,d*.75),'#7a7f86');v.add(GB.boxc,G,TM(x+d*S(.036),y-S(.05),z+S(.002),S(.03),S(.008),T,0,0,-d*.75));}
+ crown(x,y+S(.045),.8);
+}
+function rankPins(v,r){
+ if(r<0)return;
+ // collar pins, small, on both collar points
+ for(const s of[-1,1])rankPin(v,r,s*.15,1.41,.325,.8);
+ // breast badge on a dark plate with a gold rim
+ v.add(GB.boxc,'#8a6a2a',TM(-.19,1.19,.345,.17,.17,.016));v.add(GB.boxc,'#1d2838',TM(-.19,1.19,.352,.15,.15,.016));
+ rankPin(v,r,-.19,1.19,.368,1.15);
+}
+
 function makeMouse(o){
  const fur=o.fur,furL=mixHex(fur,'#f3e6d4',.5),furD=shadeHex(fur,.72),skin='#e3a3a7',skinD='#c4868b',coat=o.coat,trim=o.trim||'#e8e0cc',pants=o.pants||'#5a4a3a';
  const g=new THREE.Group(),body=new THREE.Bone();g.add(body);const U=unitOf(o),UH=U&&!['regiment','officercoat','civcoat','civtunic','civapron'].includes(U);   // UH: the unit morph brings its own helmet
- const kB=['B4',U,fur,coat,trim,pants,o.apron,o.epaulettes,o.crossbelt,o.cape,o.ruler,o.sash,o.cuirass,o.corps,o.scarf,o.bag].join('|');
+ const kB=['B4',U,fur,coat,trim,pants,o.apron,o.epaulettes,o.crossbelt,o.cape,o.ruler,o.sash,o.cuirass,o.corps,o.scarf,o.bag,o.rk].join('|');
  body.add(pm(partGeo(kB,v=>{
   // soldiers wear a studio unit morph (mouseUnitGeo); only accessories are built here
   if(o.crossbelt&&!U)for(const s of[-1,1])v.add(GB.boxc,'#efeae0',TM(0,1.08,.32,.07,.74,.025,0,0,s*.6));
@@ -1659,6 +1692,7 @@ function makeMouse(o){
   if(o.scarf){v.add(GB.torus,o.scarf,TM(0,1.5,.02,.33,.33,.5,PI/2,0,0));v.add(GB.boxc,o.scarf,TM(.12,1.26,.33,.11,.42,.04,.1,0,.08));v.add(GB.boxc,shadeHex(o.scarf,.8),TM(.2,1.22,.31,.1,.36,.035,.1,0,-.1));}
   if(o.bag){const bc=o.bag===true||o.bag==='true'?'#6a4a2a':o.bag;v.add(GB.boxc,'#3a2a1a',TM(0,1.08,.33,.05,.82,.025,0,0,-.62));v.add(GB.boxc,'#3a2a1a',TM(0,1.08,-.33,.05,.82,.025,0,0,.62));v.add(GB.box,bc,TM(.42,.6,.05,.13,.3,.34),shadeHex(bc,.7));v.add(GB.box,shadeHex(bc,.8),TM(.49,.82,.05,.03,.1,.34));}
   if(o.cape){v.add(GB.boxc,o.cape,TM(0,.86,-.38,.86,1.2,.05,.14,0,0),shadeHex(o.cape,.6));v.add(GB.cylc,'#f4f1ea',TM(0,1.42,-.03,.44,.13,.4));for(let i=0;i<8;i++){const a=i/8*TAU;v.add(GB.sphs,'#151515',TM(Math.cos(a)*.43,1.42,Math.sin(a)*.39-.03,.022));}}
+  rankPins(v,rkOf(o));
  })));
  const head=new THREE.Bone();head.position.set(0,1.62,0);body.add(head);
  const kH=['H3',U,fur,o.hat,o.hatCol,coat,trim,o.officer,o.corps,o.glasses,o.feather,o.earring].join('|');
@@ -2566,7 +2600,7 @@ function outfit(){
  const dress=dressNow();
  if(dress==='gov'){const gk=P.gov.k>=0?P.gov.k:P.ruler>=0?P.ruler:P.home;const gr=P.gov.k>=0?P.gov.rank:GRANKS.length-1;o={fur:P.fur,coat:'#1f2433',trim:gr>=3?'#d9b24a':'#e8e0cc',hat:gr>=5?'bicorne':'tricorn',hatCol:'#14161e',pants:'#e9e2d2',epaulettes:gr>=4,officer:true,sash:K[gk].coat,cape:gr>=6?K[gk].coat:undefined,musket:P.items.musket};}
  else if(dress==='royal'){const k=K[P.ruler];o={fur:P.fur,coat:k.coat,trim:'#e2b84a',hat:'crown',musket:true,pants:'#e9e2d2',epaulettes:true,cape:'#6b1e2e',ruler:true};}
- else if(dress==='army'){const k=K[P.army],cp=corpsNow();o={fur:P.fur,coat:k.coat,trim:k.trim,hat:CORPS[cp].hat,corps:cp,musket:true,pants:shadeHex(k.coat,.72),epaulettes:P.rank>=OFFICER_R,officer:P.rank>=OFFICER_R};}
+ else if(dress==='army'){const k=K[P.army],cp=corpsNow();o={fur:P.fur,coat:k.coat,trim:k.trim,hat:CORPS[cp].hat,corps:cp,musket:true,pants:shadeHex(k.coat,.72),epaulettes:false,officer:P.rank>=OFFICER_R,rk:String(P.rank)};}
  else o=civ;
  if(worn('cuirass')&&dress!=='royal')o.cuirass=true;if(Lk.glasses)o.glasses=Lk.glasses;if(Lk.earring)o.earring=Lk.earring;if(dress!=='civ'&&Lk.scarf)o.scarf=Lk.scarf;if(worn('helmet')&&dress==='civ')o.hat='helmet';
  if(o.musket&&typeof curWeapon==='function')o.gun=curWeapon().id;if(window.AOC_HOOK&&window.AOC_HOOK.cosLook)try{o=window.AOC_HOOK.cosLook(o,dress)||o;}catch(e){}P.vis=makeMouse(o);P.visO=o;if(window.AOC_HOOK&&window.AOC_HOOK.outfit)try{window.AOC_HOOK.outfit(o);}catch(e){}P.vis.g.scale.setScalar(Lk.size||1);scene.add(P.vis.g);P.vis.g.position.copy(P.pos);buildVM(o.coat,o.trim);}

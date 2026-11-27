@@ -265,6 +265,7 @@ async function applySave(S, blob, wseq, force) {
   if (force) await flush(S); else if (now() - S.lastFlush > 10000) flush(S);
 }
 async function flush(S) {
+  if (S.bot) { S.dirty = false; return; }
   if (!S.dirty || !S.char) return;
   S.dirty = false; S.lastFlush = now();
   const c = S.char;
@@ -557,6 +558,7 @@ async function command(S, body) {
     if (!chatAllowed(S, arg)) return; return privateMessage(S, arg.slice(0, sp), arg.slice(sp + 1).trim());
   }
   if (c === 'g' || c === 'l' || c === 'k' || c === 'a' || c === 's') return onChat(S, { ch: { g: 'global', l: 'local', k: 'kingdom', a: 'army', s: 'squad' }[c], body: arg });
+  if (c === 'sproket') return BOT.command(S, arg);
   if (c === 'online') return toast(S, `${online.size} player${online.size === 1 ? '' : 's'} online.`);
   if (!S.admin) return err(S, 'Unknown command. Try /w Name message, /g, /l, /k, /a, /online.');
   if (c === 'announce') return system('global', '📜 ' + arg);
@@ -1027,6 +1029,134 @@ WORLD = require('./world')({ db, log, each, send, err, toast, online, offices, n
 for (const [k, fn] of Object.entries(WORLD.handlers)) H[k] = fn;
 let wLast = now();
 setInterval(() => { const t = now(); try { WORLD.tick(Math.min(2, (t - wLast) / 1000)); } catch (e) { log('world tick error', e.stack || e.message); } wLast = t; }, 250);
+
+// ---------------------------------------------------------------- SPROKET, the tester bot
+// A soldier run by the server. He is a normal player to everyone else (player list, admin list, rosters, chat, squads),
+// online whenever at least one real player is. He follows the nearest player, answers when spoken to, accepts squad
+// and regiment orders, and admins can drive him with /sproket commands. He has no database account: his rank, division
+// and army are kept in the shared world's save.
+const BOT_ID = '00000000-0000-4000-8000-00005b0c4e70', BOT_NAME = 'Sproket';
+const BOT = (() => {
+  const brainQ = [];
+  const S = {
+    bot: true, nid: 0, id: BOT_ID, char: null, ready: false, x: NaN, y: 0, z: NaN, yaw: 0, mode: 'walk', spd: 0, inside: null, moved: false,
+    seen: new Set(), dirty: false, lastFlush: 0, lastSave: 0, lastMove: 0, lastEmote: 0, earn: { budget: 2000, t: now() },
+    chat: { times: [], last: 0, lastText: '', lastAt: 0, strikes: 0, muteUntil: 0 }, mil: null, trade: null, admin: false,
+    ws: { open: true, send(raw) { try { brainQ.push(JSON.parse(raw)); } catch (e) {} }, close() {} },
+  };
+  const B = { mode: 'follow', target: null, goto: null, lastReal: 0, force: null, lastReply: 0, enteredAt: 0 };
+  const store = () => { const W = WORLD && WORLD.state; if (!W) return; W.bot = { army: S.mil ? S.mil.army : -1, rank: S.mil ? S.mil.rank : 0, corps: S.mil ? S.mil.corps : 'line', kingdom: S.char.kingdom, look: S.char.look }; };
+  function makeChar() {
+    const saved = (WORLD && WORLD.state && WORLD.state.bot) || {};
+    const k = clampInt(saved.kingdom === undefined ? 1 : saved.kingdom, 0, 3);
+    S.char = { user_id: BOT_ID, name: BOT_NAME, kingdom: k, gold: 100, wallet_seq: 0, items: {}, cargo: {}, look: saved.look || { fur: '#a07850', coat: '#4f6b3a', trim: '#d9ccb0', pants: '#4a3f33' }, save: { name: BOT_NAME, home: k }, army: -1, army_rank: 0, gov_rank: 0, achievements: { medals: [] }, created_at: '2026-11-27T19:00:00.000Z' };
+    const army = saved.army === undefined ? k : clampInt(saved.army, -1, 3);
+    S.mil = army >= 0 ? { army, rank: clampInt(saved.rank === undefined ? 1 : saved.rank, 0, MAX_RANK), regiment_id: null, role: 'member', corps: CORPS[saved.corps] ? saved.corps : 'line', lastUp: now() } : null;
+    S.char.army = army; S.char.army_rank = S.mil ? S.mil.rank : 0; S.vlook = lockLook(S, S.char.look);
+  }
+  const real = () => [...online.values()].filter(O => O.ready && !O.bot && O.char);
+  function enter() {
+    makeChar(); S.nid = nidSeq++; S.ready = true; S.seen = new Set(); S.x = NaN; S.z = NaN; S.inside = null; B.enteredAt = now();
+    online.set(S.id, S); byNid.set(S.nid, S); names.set(S.id, BOT_NAME);
+    if (WORLD) WORLD.onEnter(S);
+    log(`${BOT_NAME} (tester bot) entered the world (${online.size} online)`);
+  }
+  function leave() {
+    if (!S.ready) return; store(); S.ready = false;
+    online.delete(S.id); byNid.delete(S.nid);
+    for (const O of online.values()) if (O.seen.delete(S.nid)) send(O, { t: 'pl', nid: S.nid });
+    if (WORLD) WORLD.onLeave(S);
+    log(`${BOT_NAME} (tester bot) left (${online.size} online)`);
+  }
+  const say = (ch, body, to) => onChat(S, ch === 'pm' ? { ch: 'pm', to, body } : { ch, body }).catch(() => {});
+  const emote = e => H.emote(S, { e });
+  // the one he walks beside: a named player, else the nearest real player outdoors
+  function leader() {
+    const R = real().filter(O => fin(O.x));
+    if (B.target) { const T = R.find(O => O.id === B.target); if (T) return T; }
+    let best = null, bd = 1e9; for (const O of R) { const d = fin(S.x) ? Math.hypot(O.x - S.x, O.z - S.z) : 0; if (d < bd) { bd = d; best = O; } }
+    return best;
+  }
+  function step(dt) {
+    if (!S.ready) return;
+    const L = leader(); if (!L) return;
+    if (!fin(S.x)) { S.x = L.x + 3; S.z = L.z + 3; S.y = L.y; S.inside = L.inside; S.moved = true; return; }
+    let tx = S.x, tz = S.z, near = 0;
+    if (B.mode === 'follow') { tx = L.x; tz = L.z; near = 3.2; S.inside = L.inside; }
+    else if (B.mode === 'goto' && B.goto) { tx = B.goto.x; tz = B.goto.z; near = .6; }
+    const dx = tx - S.x, dz = tz - S.z, d = Math.hypot(dx, dz);
+    if (B.mode === 'follow' && d > 160) { S.x = L.x + 3; S.z = L.z + 3; S.y = L.y; S.moved = true; return; }   // keeps up with horses, ships and teleports
+    if (d > near) {
+      const sp = Math.min(d - near, (d > 25 ? 9 : 4.2) * dt); S.x += dx / d * sp; S.z += dz / d * sp; S.yaw = Math.atan2(dx, dz); S.spd = sp / dt;
+      if (Math.hypot(L.x - S.x, L.z - S.z) < 60) S.y += (L.y - S.y) * Math.min(1, dt * 3);   // ground height from the player beside him
+      S.mode = 'walk'; S.moved = true;
+    } else if (S.spd) { S.spd = 0; S.moved = true; if (B.mode === 'goto') B.mode = 'stay'; }
+    else if (B.mode === 'follow' && Math.abs(((Math.atan2(L.x - S.x, L.z - S.z) - S.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > .4) { S.yaw = Math.atan2(L.x - S.x, L.z - S.z); S.moved = true; }
+  }
+  const HELP = 'I\'m Sproket, the realm\'s tester. Say "Sproket follow me", "Sproket stay", "Sproket come", "Sproket salute" or "Sproket status".';
+  function heard(m) {   // a chat line reached him
+    if (!m || m.t !== 'chat' || m.sys || m.from === BOT_NAME || m.echo) return;
+    const direct = m.ch === 'pm', body = String(m.body || '');
+    if (!direct && !/\bsproket\b/i.test(body)) return;
+    if (now() - B.lastReply < 750) return; B.lastReply = now();
+    const O = [...online.values()].find(x => x.ready && x.char && x.char.name === m.from);
+    const reply = txt => direct ? say('pm', txt, m.from) : say(m.ch === 'kingdom' || m.ch === 'army' || m.ch === 'squad' || m.ch === 'global' ? m.ch : 'local', txt);
+    const t = body.toLowerCase();
+    if (/follow/.test(t) && O) { B.mode = 'follow'; B.target = O.id; return reply(`Right behind you, ${m.from}.`); }
+    if (/\b(stay|halt|wait|stop)\b/.test(t)) { B.mode = 'stay'; return reply('Holding here.'); }
+    if (/\bcome\b|over here/.test(t) && O && fin(O.x)) { B.mode = 'follow'; B.target = O.id; S.x = O.x + 2; S.z = O.z + 2; S.y = O.y; S.inside = O.inside; S.moved = true; return reply('On my way!'); }
+    if (/salute/.test(t)) { emote('salute'); return; }
+    if (/\bwave\b|hello|hi\b/.test(t)) { emote('wave'); return reply(`Hello, ${m.from}!`); }
+    if (/status|report/.test(t)) { const mi = milInfo(S); const sq = WORLD && WORLD.squadOf(S.id); return reply(mi ? `${mi.rankName} of the ${CORPS[mi.corps]}, ${KNAMES[mi.army]} Army${sq ? ', squad ' + sq.name : ''}. ${B.mode === 'follow' ? 'Following ' + (O && B.target === O.id ? 'you' : 'the nearest soldier') : 'Holding position'}.` : 'Not enlisted.'); }
+    return reply(HELP);
+  }
+  function think() {
+    while (brainQ.length) {
+      const m = brainQ.shift();
+      if (m.t === 'chat') heard(m);
+      else if (m.t === 'wsqinv') setTimeout(() => { WORLD.handlers.wcmd(S, { op: 'sqAcc', sq: m.sq, ok: true }); setTimeout(() => say('squad', `Sproket reporting to ${m.name}.`), 1200); }, 1500);
+      else if (m.t === 'regInvite') setTimeout(() => H.regJoin(S, { id: m.id, ok: true }).catch(() => {}), 1500);
+      else if (m.t === 'rankSet' || m.t === 'mil') store();
+      else if (m.t === 'tradeAsk' || m.t === 'tradeReq') {}
+    }
+  }
+  // admins drive him: /sproket <what>
+  async function command(A, arg) {
+    if (!A.admin) return err(A, 'Only admins can command Sproket. Talk to him instead: say "Sproket help".');
+    const [c, ...r] = String(arg || '').trim().split(' '); const rest = r.join(' ');
+    if (!S.ready && c !== 'on') return err(A, 'Sproket is offline. /sproket on brings him in.');
+    if (c === 'on') { B.force = true; if (!S.ready) enter(); return toast(A, 'Sproket is online.'); }
+    if (c === 'off') { B.force = false; leave(); return toast(A, 'Sproket has logged off. He comes back with the next player, or with /sproket on.'); }
+    if (c === 'say' || c === 'l') return say('local', rest);
+    if (c === 'g') return say('global', rest);
+    if (c === 'k') return say('kingdom', rest);
+    if (c === 'a') return say('army', rest);
+    if (c === 's') return say('squad', rest);
+    if (c === 'pm') { const [to, ...t] = r; return say('pm', t.join(' '), to); }
+    if (c === 'follow') { const T = rest ? real().find(O => O.char.name.toLowerCase() === rest.toLowerCase()) : A; if (!T) return err(A, 'No one online by that name.'); B.mode = 'follow'; B.target = T.id; return toast(A, `Sproket follows ${T.char.name}.`); }
+    if (c === 'stay') { B.mode = 'stay'; return toast(A, 'Sproket holds his position.'); }
+    if (c === 'come') { if (!fin(A.x)) return err(A, 'Step into the world first.'); S.x = A.x + 2; S.z = A.z + 2; S.y = A.y; S.inside = A.inside; S.moved = true; B.mode = 'follow'; B.target = A.id; return toast(A, 'Sproket comes to you.'); }
+    if (c === 'goto') { const [x, z] = r.map(Number); if (!fin(x) || !fin(z)) return err(A, 'Usage: /sproket goto <x> <z>'); B.mode = 'goto'; B.goto = { x, z }; return toast(A, `Sproket marches to ${Math.round(x)}, ${Math.round(z)}.`); }
+    if (c === 'emote') return emote(rest || 'salute');
+    if (c === 'join') { const W = WORLD.state; const R = W.regs.find(x => String(x.id) === rest || x.name.toLowerCase().includes(rest.toLowerCase())); if (!R) return err(A, 'No company matches that.'); WORLD.handlers.wcmd(S, { op: 'join', id: R.id }); return toast(A, `Sproket asks to join the ${R.name}.`); }
+    if (c === 'leave') { WORLD.handlers.wcmd(S, { op: 'leave' }); return toast(A, 'Sproket leaves his company.'); }
+    if (c === 'look') { try { const l = JSON.parse(rest); S.char.look = cleanLook(l); S.vlook = lockLook(S, S.char.look); announcePlayer(S); store(); return toast(A, 'Sproket changes his look.'); } catch (e) { return err(A, 'Usage: /sproket look {"coat":"#556b2f"}'); } }
+    if (c === 'status' || !c) { const mi = milInfo(S); return toast(A, `Sproket: ${mi ? mi.rankName + ', ' + CORPS[mi.corps] + ', ' + KNAMES[mi.army] + ' Army' : 'civilian'} · ${B.mode}${fin(S.x) ? ' · at ' + Math.round(S.x) + ', ' + Math.round(S.z) : ''}`); }
+    return err(A, 'Sproket commands: say/g/k/a/s/pm <text>, follow [name], stay, come, goto <x> <z>, emote <e>, join <company>, leave, look <json>, status, on, off. Ranks and divisions: use the admin list like any player.');
+  }
+  let last = now();
+  setInterval(() => {
+    const t = now(), dt = Math.min(.5, (t - last) / 1000); last = t;
+    const n = real().length; if (n) B.lastReal = t;
+    if (n && !S.ready && B.force !== false) enter();
+    if (B.force === false && !n) B.force = null;
+    if (!n && S.ready && t - B.lastReal > 30000 && !B.force) leave();
+    if (!n && B.force && t - B.lastReal > 30000) { B.force = null; leave(); }
+    try { think(); step(dt); } catch (e) { log('sproket error', e.stack || e.message); }
+  }, 100);
+  setInterval(() => { if (S.ready) store(); }, 20000);
+  return { S, command, get on() { return S.ready; } };
+})();
 
 let lastTick = now();
 setInterval(tickMovement, 100);

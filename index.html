@@ -1644,37 +1644,22 @@ function corpsBody(v,c,coat){const lea='#4a3222',leaD='#2e1e14',gm='#3b3c38';
  if(c==='heavy'){const hm='#4b4f45',hd='#25271f';v.add(GB.sph,hm,TM(0,1.05,.08,.47,.38,.43),'#33362f');      // banded heavy armour
   for(const y of[.86,.99,1.12,1.25])v.add(GB.boxc,hd,TM(0,y,.47,.56,.022,.05));for(const s of[-1,1]){v.add(GB.sph,hm,TM(s*.38,1.4,0,.2,.12,.2),'#33362f');v.add(GB.sphs,hd,TM(s*.24,1.3,.36,.03));}}
  if(c==='officer'){v.add(GB.tcyl,coat,TM(0,.3,0,.45,.55,.41),shadeHex(coat,.7));v.add(GB.boxc,leaD,TM(0,1.1,.33,.06,.82,.025,0,0,.6));v.add(GB.boxc,leaD,TM(-.43,.72,.12,.08,.22,.15,.25,0,0));v.add(GB.sphs,'#b8913e',TM(-.47,.8,.16,.02));}}
-// ================= RANK PINS ON THE UNIFORM =================
-// o.rk is the wearer's army rank (the server sets it for other players). Every soldier wears rank pins that match
-// the rank chart: a badge on the left breast and a small pin on each collar point. Recruit and Private share a plain button.
-const RK_GOLD='#e9c25a',RK_DARK='#5a3d0c',RK_BRONZE='#b0743a',RK_RED='#c0303a';
+// ================= RANK PLAQUE ON THE UNIFORM =================
+// o.rk is the wearer's army rank (the server sets it for other players). The rank is a flat metal plaque worked into the
+// left breast of the coat: a bottom row of blue tiles for the enlisted steps and a top row of red tiles for officers.
+// Recruit and Private share one blue tile; the General's plaque has a gold frame.
+const RK_PLATE='#9aa1aa',RK_PLATE_D='#5d636b',RK_BLUE='#2f6fd6',RK_REDT='#cf3530',RK_OFF='#2a2e35',RK_GOLDF='#d9b24a';
 function rkOf(o){const r=o&&o.rk!==undefined&&o.rk!==null&&o.rk!==''?+o.rk:-1;return Number.isFinite(r)?r:-1;}
-// one pin, drawn in the x-y plane facing forward (+z) at (x,y,z); k scales it
-function rankPin(v,r,x,y,z,k){
- const S=a=>a*k,G=RK_GOLD,T=S(.014);
- const bar=(cx,cy,len,ang)=>v.add(GB.boxc,G,TM(cx,cy,z,S(len),S(.017),T,0,0,ang),RK_DARK);
- const chev=cy=>{for(const d of[-1,1])bar(x+d*S(.026),cy+S(.012),.064,-d*.6);};        // points down, like the chart
- const rocker=cy=>{bar(x-S(.034),cy,.05,.35);bar(x+S(.034),cy,.05,-.35);bar(x,cy-S(.01),.03,0);};
- const star=(cx,cy,s=1)=>{v.add(GB.sphs,G,TM(cx,cy,z+S(.004),S(.016*s)));for(let i=0;i<4;i++)v.add(GB.boxc,G,TM(cx,cy,z,S(.06*s),S(.013*s),T,0,0,i*Math.PI/4),RK_DARK);};
- const crown=(cx,cy,s=1)=>{v.add(GB.boxc,G,TM(cx,cy-S(.022*s),z,S(.075*s),S(.02*s),T),RK_DARK);for(const d of[-1,0,1])v.add(GB.cone8,G,TM(cx+d*S(.028*s),cy+S(.008*s),z,S(.013*s),S(.042*s),S(.01*s)));v.add(GB.sphs,RK_RED,TM(cx,cy-S(.022*s),z+S(.007),S(.009*s)));};
- if(r<=1){v.add(GB.sphs,RK_BRONZE,TM(x,y,z,S(.028)));v.add(GB.sphs,shadeHex(RK_BRONZE,.7),TM(x,y,z+S(.01),S(.012)));return;}
- if(r<=5){const n=r===2?1:r===3?2:3;const top=y+(n-1)*S(.019)+(r===5?S(.016):0);for(let i=0;i<n;i++)chev(top-i*S(.038));if(r===5)rocker(top-n*S(.038)-S(.004));return;}
- if(r===6){v.add(GB.torus,G,TM(x,y,z,S(.055),S(.055),S(.03)));crown(x,y+S(.004),.8);return;}
- if(r===7){star(x,y+S(.03));star(x,y-S(.03));return;}
- if(r===8){star(x,y+S(.048),.85);star(x,y,.85);star(x,y-S(.048),.85);return;}
- if(r===9)return crown(x,y,1.25);
- if(r===10){crown(x,y+S(.036));star(x-S(.028),y-S(.038),.7);star(x+S(.028),y-S(.038),.7);return;}
- // General: crossed swords under a crown
- for(const d of[-1,1]){v.add(GB.boxc,'#dfe3e8',TM(x,y-S(.012),z,S(.012),S(.11),T,0,0,d*.75),'#7a7f86');v.add(GB.boxc,G,TM(x+d*S(.036),y-S(.05),z+S(.002),S(.03),S(.008),T,0,0,-d*.75));}
- crown(x,y+S(.045),.8);
-}
+function rankTiles(r){const blue=r<0?0:r<=1?1:Math.min(6,r);const red=r>=11?6:r>=7?r-6:0;return[blue,red];}
 function rankPins(v,r){
  if(r<0)return;
- // collar pins, small, on both collar points
- for(const s of[-1,1])rankPin(v,r,s*.15,1.41,.325,.8);
- // breast badge on a dark plate with a gold rim
- v.add(GB.boxc,'#8a6a2a',TM(-.19,1.19,.345,.17,.17,.016));v.add(GB.boxc,'#1d2838',TM(-.19,1.19,.352,.15,.15,.016));
- rankPin(v,r,-.19,1.19,.368,1.15);
+ const[blue,red]=rankTiles(r),x0=-.2,y0=1.2,z=.343,ry=.28;   // sits on the chest, turned a little with the curve of the coat
+ const T=(dx,dy,dz,sx,sy,sz)=>TM(x0+dx*Math.cos(ry),y0+dy,z+dz+dx*Math.sin(ry),sx,sy,sz,0,-ry,0);
+ if(r>=11)v.add(GB.boxc,RK_GOLDF,T(0,0,-.002,.275,.112,.012));
+ v.add(GB.boxc,RK_PLATE,T(0,0,0,.258,.095,.014),RK_PLATE_D);
+ const w=.031,gap=.009,x1=-(6*w+5*gap)/2+w/2;
+ for(let row=0;row<2;row++)for(let i=0;i<6;i++){const on=row===0?i<red:i<blue;const col=on?(row===0?RK_REDT:RK_BLUE):RK_OFF;
+  v.add(GB.boxc,col,T(x1+i*(w+gap),row===0?.022:-.022,.008,w,.029,.006));}
 }
 
 function makeMouse(o){

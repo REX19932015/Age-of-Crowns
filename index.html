@@ -2650,7 +2650,7 @@ function fire(){
 function melee(){if(state!=='play'||P.mode!=='walk'||P.melee>0)return;P.melee=.7;P.vis.swing=.35;const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);
  let best=null,bd=2.8;for(const n of NPCS){if(n.dead||!n.hostile())continue;const dx=n.pos.x-P.pos.x,dz=n.pos.z-P.pos.z,d=Math.hypot(dx,dz);if(d<bd&&(dx*fx+dz*fz)/d>.2){best=n;bd=d;}}
  if(best)hurtNPC(best,P.items.sabre?55:P.vis.musket?30:18);if(P.items.sabre)P.melee=.45;}
-function hurtNPC(n,dmg,quiet){if(quiet&&!n.dead&&n.hp-dmg<=0){n.hp=0;n.die();return;}if(n.dead)return;n.hp-=dmg;n.alert=true;n.cool=Math.min(n.cool,1.6);if(n.hp<=0){n.die();onKill(n);}}
+function hurtNPC(n,dmg,quiet){if(quiet&&!n.dead&&n.hp-dmg<=0){n.hp=0;n.die();return;}if(n.dead)return;n.hp-=dmg;n.alert=true;n.cool=Math.min(n.cool,1.6);if(n.hp<=0){if(n.reg&&SHARED())wcmd('hit',{id:n.reg.id});n.die();onKill(n);}}
 function onKill(n){if(n.kind==='escort'||CINE.on)return;P.kills++;if(n.k>=0&&(n.kind==='guard'||n.kind==='soldier')&&!atWar(P.army,n.k)&&!n.battle)addCrime(n.k,'murder');skillXP('marksman',2);if(n.kind==='assassin'){news(`${P.name} cuts down an assassin sent to murder them!`,'gold');addRep(n.paidBy,-5);}if(n.k>=0&&(n.kind==='soldier'||n.kind==='guard'))addRep(n.k,atWar(P.army,n.k)?-2:-12);if(n.kind==='bandit'&&n.camp!==undefined&&CAMPS[n.camp])addRep(CAMPS[n.camp].k,1);if(n.kind==='fang'){const g=n.chief?600:Math.round(25+rr()*20);P.gold+=g;for(let k=0;k<4;k++)addRep(k,n.chief?6:1);toast(n.chief?'Mordecai Ironfang is defeated! The League rewards you with 600 gold.':`Iron Fang insurgent defeated. The League pays a ${g} gold bounty.`,'gold');if(n.chief)news(`${P.name} defeats Mordecai Ironfang, leader of the Iron Fang, on Fanghold Isle. The League of Kingdoms rejoices.`,'gold');}
  if(n.kind==='pirate'){for(let k=0;k<4;k++)addRep(k,1);const g=Math.round(20+rr()*25);P.gold+=g;toast(`Pirate defeated. You find ${g} gold.`,'gold');if(n.captain){news(`Captain Rustclaw falls to ${P.name}!`,'gold');P.gold+=400;if((P.story||0)===4){toast('You find a ledger in the captain’s coat, full of payments to spies in every court…','gold');advanceStory();}}}
  if(n.kind==='bandit'){const g=Math.round(8+rr()*14);P.gold+=g;sfxCoin();toast(`Bandit defeated. You find ${g} gold on them.`,'gold');}
@@ -4920,7 +4920,7 @@ function buildStadium(){const c=STADC,FY=STADC.FY,A=72,B=46,T=18,OUT=8+T*2;Objec
 const RUINVIS={};
 function ruinDay(){for(const t of TOWNS){if(!(t.ruin>0))continue;const own=t.occ>=0?t.occ:t.k;let rec=.02;if(own>=0&&aiControlled(own)&&GOV.treasury[own]>2000){GOV.treasury[own]-=200;rec+=.06;}t.ruin=Math.max(0,t.ruin-rec);if(t.ruin<.05){t.ruin=0;news(`${t.name} has been rebuilt. Fresh timber and new roofs shine in the sun.`,'good');}ruinVisual(t);}}
 function talkMayorRuin(n){const t=n.town;const cost=Math.round(t.ruin*1600);openPanel(n.title,`${t.name}: ${Math.round(t.ruin*100)}% in ruins`,`“Look around you. ${t.ruin>.5?'Half the town is ashes.':'Too many roofs are gone.'} Taxes are down, families sleep in the square, and we cannot rebuild without gold.”`,
- [{label:`Pay for the rebuilding (${cost} gold)`,primary:true,disabled:P.gold<cost,fn:()=>{P.gold-=cost;t.ruin=0;ruinVisual(t);if(t.k>=0){addRep(t.k,10);GOV.appr[t.k]=Math.min(100,GOV.appr[t.k]+4);}news(`${P.name} pays to rebuild ${t.name}! The town will not forget it.`,'gold');closePanel();save();}},{label:'Give 200 gold for the homeless',disabled:P.gold<200,fn:()=>{P.gold-=200;t.ruin=Math.max(0,t.ruin-.12);ruinVisual(t);if(t.k>=0)addRep(t.k,4);toast('Blankets, bread and timber for the homeless.','good');closePanel();}},{label:'Ask about the damage',fn:()=>{$('pbody').textContent='“Every battle and every siege leaves its mark. The crown rebuilds slowly; a generous patron could do it in a day.”';}}]);}
+ [{label:`Pay for the rebuilding (${cost} gold)`,primary:true,disabled:P.gold<cost,fn:()=>{if(SHARED()){wcmd('rebuild',{town:t.idx,full:true});closePanel();return;}P.gold-=cost;t.ruin=0;ruinVisual(t);if(t.k>=0){addRep(t.k,10);GOV.appr[t.k]=Math.min(100,GOV.appr[t.k]+4);}news(`${P.name} pays to rebuild ${t.name}! The town will not forget it.`,'gold');closePanel();save();}},{label:'Give 200 gold for the homeless',disabled:P.gold<200,fn:()=>{if(SHARED()){wcmd('rebuild',{town:t.idx,full:false});closePanel();return;}P.gold-=200;t.ruin=Math.max(0,t.ruin-.12);ruinVisual(t);if(t.k>=0)addRep(t.k,4);toast('Blankets, bread and timber for the homeless.','good');closePanel();}},{label:'Ask about the damage',fn:()=>{$('pbody').textContent='“Every battle and every siege leaves its mark. The crown rebuilds slowly; a generous patron could do it in a day.”';}}]);}
 // ================= THE LIBRARY OF THE GREAT WAR (PINEHALLOW) =================
 function buildWarLib(){const t=capitalOf(1);const sp=manorSpot(t);if(!sp)return;const b=new VB(),wb=new VB();const y=heightAt(sp.x,sp.z);const ry=Math.atan2(t.x-sp.x,t.z-sp.z);const f=FR(sp.x,y,sp.z,ry);
  b.add(GB.box,'#8a8478',L(f,0,-1.4,0,22,2,16));b.add(GB.box,'#d8d0c0',L(f,0,.6,-1,20,11,12),'#b8b0a0');for(let q=-8;q<=8;q+=3.2)b.add(GB.cyl,'#efe8da',L(f,q,.6,5.6,.6,10,.6),'#d0c8b8');b.add(GB.box,'#d8d0c0',L(f,0,10.6,5.6,21,1,2.6));b.add(GB.prism,'#c8c0b0',L(f,0,11.6,5.6,21.2,3,2.8,0,0,0));b.add(GB.hemi,'#5a6a4a',L(f,0,11.6,-1,6,5,6));
@@ -5533,7 +5533,7 @@ function mkCompany(k,t,n,type){type=type||'foot';const used=REGS.filter(r=>r.k==
 // recruits always go to the reserves; a new company forms when the kingdom is short of one
 function newReg(k,t,str,type){type=type||'foot';str=Math.min(Math.round(str),kRoom(k,type));if(str<1)return null;RES[k][type]+=str;
  if(REGS.filter(r=>r.k===k&&regTy(r)===type).length<FIELD[type].n&&RES[k][type]>=Math.ceil(FIELD[type].size/2)){const n=Math.min(FIELD[type].size,RES[k][type]);RES[k][type]-=n;return mkCompany(k,t,n,type);}return null;}
-function initRegiments(){if(REGS.length)return;for(let k=0;k<4;k++){const ts=TOWNS.filter(t=>t.k===k&&mainland(t));const cap=capitalOf(k);const c2=ts.filter(t=>t.type==='city');const t2=c2[0]||ts.find(t=>t.type==='town'||t.type==='village')||cap;
+function initRegiments(){if(REGS.length||SHARED())return;for(let k=0;k<4;k++){const ts=TOWNS.filter(t=>t.k===k&&mainland(t));const cap=capitalOf(k);const c2=ts.filter(t=>t.type==='city');const t2=c2[0]||ts.find(t=>t.type==='town'||t.type==='village')||cap;
  RES[k]={foot:100,guns:120,horse:300};const at={foot:[cap,t2,cap],horse:[c2[1]||t2,cap],guns:[cap,cap]};
  for(const ty in FIELD)for(let i=0;i<FIELD[ty].n;i++){const n=Math.min(FIELD[ty].size,RES[k][ty]);RES[k][ty]-=n;mkCompany(k,at[ty][i],n,ty);}}}
 // fold any older, larger regiments into the new companies; everything above the field strength becomes the kingdom's reserves
@@ -5582,7 +5582,7 @@ function regMat(R){if(R.sol)return;R.sol=[];R.gunsM=[];const n=Math.round(R.str)
  if(R.busy)for(const u of R.sol)u.cool=1+rr()*.4;}
 function regDemat(R){if(!R.sol)return;for(const u of R.sol)if(!u.dead)u.remove();R.sol=null;for(const G of R.gunsM||[])scene.remove(G.grp);R.gunsM=null;}
 function regLoss(u){const R=u.reg;if(!R)return;u.regGone=true;if(R.sol){const i=R.sol.indexOf(u);if(i>=0){R.sol.splice(i,1);R.sol.forEach((s,j)=>s.slot=j);}}R.str=Math.max(0,(R.sol?R.sol.length:R.str-1));R.mor=Math.max(0,R.mor-3.2/(divOf(R).mor||1));}
-function regCasualty(R){if(R.sol&&R.sol.length){const u=R.sol[Math.floor(rr()*R.sol.length)];hurtNPC(u,999,true);}else R.str=Math.max(0,R.str-1);}
+function regCasualty(R){if(SHARED())return;if(R.sol&&R.sol.length){const u=R.sol[Math.floor(rr()*R.sol.length)];hurtNPC(u,999,true);}else R.str=Math.max(0,R.str-1);}
 
 // ---- each soldier of a company: keep formation, fight, rout
 function regUnitUpdate(u,dt,dP){const R=u.reg;if(!R.sol||!REGS.includes(R)){u.remove();return true;}
@@ -5593,10 +5593,10 @@ function regUnitUpdate(u,dt,dP){const R=u.reg;if(!R.sol||!REGS.includes(R)){u.re
  if(u.foe&&u.foe!=='P'&&u.foe.dead)u.foe=null;
  if(u.foe){const fp=u.foe==='P'?P.pos:u.foe.pos;const ex=fp.x-u.pos.x,ez=fp.z-u.pos.z,ed=Math.hypot(ex,ez);face=Math.atan2(ex,ez);u.cool-=dt;
   const charge=D.melee&&!(D.gun&&!u.fired&&ed>16);
-  if(charge&&R.stance!=='defend'){if(vis&&u.vis.aimed)setAim(u.vis,false);if(ed>2.4){spd=(u.mounted?7.2:4.6)*D.spd;u.tgt={x:fp.x,z:fp.z};}else{u.tgt=null;if(u.cool<=0){u.cool=1.1+rr()*.5;u.vis.swing=.35;const dm=(u.mounted?34:26)*D.atk;if(u.foe==='P'){if(rr()<.6)hurtPlayer(dm*.55);}else{const dd=u.foe.reg?divOf(u.foe.reg).def:1;hurtNPC(u.foe,dm/dd,true);}if(vis&&rr()<.4)puff(u.pos.clone().add(new V3(0,.4,0)),1);}}}
+  if(charge&&R.stance!=='defend'){if(vis&&u.vis.aimed)setAim(u.vis,false);if(ed>2.4){spd=(u.mounted?7.2:4.6)*D.spd;u.tgt={x:fp.x,z:fp.z};}else{u.tgt=null;if(u.cool<=0){u.cool=1.1+rr()*.5;u.vis.swing=.35;const dm=(u.mounted?34:26)*D.atk;if(u.foe==='P'){if(rr()<.6)hurtPlayer(dm*.55);}else{const dd=u.foe.reg?divOf(u.foe.reg).def:1;if(!SHARED())hurtNPC(u.foe,dm/dd,true);}if(vis&&rr()<.4)puff(u.pos.clone().add(new V3(0,.4,0)),1);}}}
   else{if(vis)setAim(u.vis,true);const s=regSlot(R,u.slot);const sd=Math.hypot(s.x-u.pos.x,s.z-u.pos.z);if(sd>1.2&&R.stance!=='defend'){spd=Math.min(3.6,sd*1.4);u.tgt=s;}else u.tgt=null;
    if(u.cool<=0&&ed<62){u.cool=5.2+rr()*.9;u.fired=true;if(vis){u.vis.g.updateMatrixWorld(true);const mz=muzzleOf(u.vis);puff(mz,2);tracer(mz,fp.clone().add(new V3(0,1.1,0)));sfxShot(clamp(1-dP/170,0,1)*.5);}
-    if(u.foe==='P')npcFire(u,dP);else if(rr()<.34*(D.acc||1)){const dd=u.foe.reg?divOf(u.foe.reg).def:1;hurtNPC(u.foe,(18+rr()*10)*D.atk/dd,true);}}}}
+    if(u.foe==='P')npcFire(u,dP);else if(rr()<.34*(D.acc||1)){const dd=u.foe.reg?divOf(u.foe.reg).def:1;if(!SHARED())hurtNPC(u.foe,(18+rr()*10)*D.atk/dd,true);}}}}
  else{if(vis&&u.vis.aimed)setAim(u.vis,false);const s=regSlot(R,u.slot);const sd=Math.hypot(s.x-u.pos.x,s.z-u.pos.z);if(sd>.7){spd=Math.min(u.mounted?8:4.2,.6+sd*1.3);u.tgt=s;}else{u.tgt=null;face=R.yaw||0;}}
  u.move(dt,spd,face,vis);regPose(u,spd,vis,dt);return true;}
 function regPose(u,spd,vis,dt){if(!u.mounted||!vis)return;u.vis.legs[0].rotation.x=u.vis.legs[1].rotation.x=-1.3;const b=horseAnim(u.horse,spd,dt||1/60);u.vis.g.children[0].position.y=2.05+b;}
@@ -5621,7 +5621,7 @@ function armyTick(dt){companyHud(dt);
  ARMYT-=dt;if(ARMYT>0){armyLOD(dt);return;}ARMYT=.5;
  const list=REGS.map(R=>({R,d:Math.hypot(R.x-P.pos.x,R.z-P.pos.z)})).sort((a,b)=>a.d-b.d);let cnt=0;
  for(const q of list){const R=q.R;const want=!P.inside&&q.d<(R.sol?DEMATR:MATR)&&cnt+Math.max(1,R.str)<=MATCAP;if(want){regMat(R);cnt+=R.sol.length;}else if(R.sol)regDemat(R);}
- for(const R of REGS){if(R.rout){R.routT=(R.routT||40)-.5;R.busy=false;if(R.routT<=0){R.rout=false;R.mor=Math.max(R.mor,45);}continue;}
+ for(const R of REGS){if(SHARED()){R.foeR=null;if(R.busy&&!R.rout){let f=null,fd=1e9;for(const O of REGS){if(O===R||O.rout||!atWar(R.k,O.k))continue;const d=Math.hypot(O.x-R.x,O.z-R.z);if(d<fd){fd=d;f=O;}}if(f&&fd<140){R.foeR=f;R.foeD=fd;R.yaw=lerpA(R.yaw||0,Math.atan2(f.x-R.x,f.z-R.z),.5);if(R.sol&&!f.sol)regMat(f);}}continue;}if(R.rout){R.routT=(R.routT||40)-.5;R.busy=false;if(R.routT<=0){R.rout=false;R.mor=Math.max(R.mor,45);}continue;}
   let foe=null,fd=1e9;for(const O of REGS){if(O===R||O.rout||!atWar(R.k,O.k))continue;const d=Math.hypot(O.x-R.x,O.z-R.z);if(d<fd){fd=d;foe=O;}}
   const was=R.busy;R.busy=!!foe&&fd<(R.sol||foe.sol?95:60)&&R.stance!=='hold';
   R.foeR=R.busy?foe:null;R.foeD=fd;
@@ -5656,7 +5656,7 @@ function regFlag(R,show){if(show&&!R.flag){const g=new THREE.Group();const fl=ne
 function regVisuals(){}
 
 // ---- the campaign tick: marching, sieges, reserves, disbanding, AI
-function updateRegiments(dt){if(!REGS.length)return;for(const R of REGS)stepReg(R,dt);armyTick(dt);regT-=dt;if(regT>0)return;regT=1;
+function updateRegiments(dt){if(!REGS.length)return;if(SHARED()){wRegsFrame(dt);armyTick(dt);return;}for(const R of REGS)stepReg(R,dt);armyTick(dt);regT-=dt;if(regT>0)return;regT=1;
  for(const R of REGS){if(R.busy||R.rout)continue;const o=R.order;const D=divOf(R);
   if(o.type==='siege'){const t=TOWNS[o.town];const own=ownerT(t);const reb=t.rebel&&own===R.k;if(own===R.k&&!reb){R.order={type:'garrison',town:t.idx};R.sieg=0;continue;}if(!reb&&!atWar(R.k,own)){retreat(R);R.sieg=0;continue;}
    if(Math.hypot(t.x-R.x,t.z-R.z)<t.r*.8+30){const gar=garrisonOf(t)/6;const blocked=!reb&&REGS.some(o2=>o2.k===own&&!o2.busy&&!o2.rout&&Math.hypot(o2.x-t.x,o2.z-t.z)<t.r);
@@ -5688,13 +5688,13 @@ function openStrategy(){const S=cmdScope();if(!S&&P.army<0){toast('Join an army 
  ${occ.length?`<div class="sect">Occupied towns</div><div class="kv">${occ.map(t=>`<div>${esc(t.name)} (${K[t.k].name}) is held by ${K[t.occ].name}</div>`).join('')}</div>`:''}`);
  const cv=$('stratMap');stratDraw(cv,k);
  wireStratMap(cv,k,(mx,my)=>{const{x,z}=stratM2W(cv,mx,my);
-  if(FORTMODE&&S&&S.full){FORTMODE=false;const own=TOWNS.filter(t=>ownerT(t)===k&&mainland(t)).some(t=>Math.hypot(t.x-x,t.z-z)<700);if(!own){toast('Forts must be built within 700 paces of one of your own towns.');openStrategy();return;}if(heightAt(x,z)<1){toast('A fort cannot be built in the water.');openStrategy();return;}GOV.treasury[k]-=1500;buildFort(k,x,z);news(`${K[k].name} raises a new fort near ${placeName(x,z)}.`);openStrategy();return;}
+  if(FORTMODE&&S&&S.full){FORTMODE=false;const own=TOWNS.filter(t=>ownerT(t)===k&&mainland(t)).some(t=>Math.hypot(t.x-x,t.z-z)<700);if(!own){toast('Forts must be built within 700 paces of one of your own towns.');openStrategy();return;}if(heightAt(x,z)<1){toast('A fort cannot be built in the water.');openStrategy();return;}if(SHARED()){wcmd('fort',{x,z});setTimeout(openStrategy,600);return;}GOV.treasury[k]-=1500;buildFort(k,x,z);news(`${K[k].name} raises a new fort near ${placeName(x,z)}.`);openStrategy();return;}
   let pick=null,pd=24;for(const R of mine){const p=w2m(R.x,R.z,cv.width);const d=Math.hypot(p[0]-mx,p[1]-my);if(d<pd){pd=d;pick=R;}}if(pick){SEL=pick;openStrategy();return;}
   if(!S){const h=stratHit(cv,mx,my);if(h&&h.R&&h.R.k===P.army){joinCompany(h.R);openStrategy();}return;}if(!SEL){toast('Select one of your companies first.');return;}if(!canControl(SEL,S)){toast('Take command of that company first.');return;}if(SEL.rout){toast('That company is fleeing and will not answer orders until it rallies.');return;}
   let tw=null,td=22;for(const t of TOWNS){const p=w2m(t.x,t.z,cv.width);const d=Math.hypot(p[0]-mx,p[1]-my);if(d<td){td=d;tw=t;}}
   if(tw){const own=ownerT(tw);if(own===k&&!tw.rebel){SEL.order={type:'garrison',town:tw.idx};toast(`The ${SEL.name} march to garrison ${tw.name}.`,'gold');}else if(tw.rebel&&own===k){SEL.order={type:'siege',town:tw.idx};SEL.sieg=0;toast(`The ${SEL.name} march to crush the rebels in ${tw.name}!`,'gold');}else if(own>=0&&atWar(k,own)){if(!mainland(tw)&&!(navyOf(k)>0&&!tw.nation)){toast(`${tw.name} cannot be reached by land, and you have no warships to carry your soldiers.`);return;}SEL.order={type:'siege',town:tw.idx};SEL.sieg=0;toast(`The ${SEL.name} march to besiege ${tw.name}!`,'gold');}else{SEL.order={type:'move',x:tw.x+30,z:tw.z+30};toast(`You are not at war with the owner of ${tw.name}. The ${SEL.name} march to its outskirts.`);}}
   else{if(heightAt(x,z)<.4){toast('Soldiers cannot march into the sea.');return;}SEL.order={type:'move',x,z};toast(`The ${SEL.name} march to ${placeName(x,z)}.`,'gold');}
-  save();stratDraw(cv,k);});
+  wOrd(SEL);save();stratDraw(cv,k);});
  $('szIn').onclick=()=>stratZoom(.6,cv,k);$('szOut').onclick=()=>stratZoom(1.6,cv,k);$('szMe').onclick=()=>stratZoom('me',cv,k);$('szAll').onclick=()=>stratZoom('all',cv,k);
  if($('myGo'))$('myGo').onclick=()=>{closeModal();rejoinCompany();};if($('myLeave'))$('myLeave').onclick=()=>{leaveCompany();openStrategy();};
 
@@ -5702,12 +5702,12 @@ function openStrategy(){const S=cmdScope();if(!S&&P.army<0){toast('Join an army 
  mc.querySelectorAll('button[data-sel]').forEach(b=>b.onclick=()=>{SEL=byId(b.dataset.sel);STV.cx=SEL.x;STV.cz=SEL.z;STV.span=Math.min(STV.span,3000);openStrategy();});
  mc.querySelectorAll('button[data-join]').forEach(b=>b.onclick=()=>{joinCompany(byId(b.dataset.join));openStrategy();});
  mc.querySelectorAll('button[data-cust]').forEach(b=>b.onclick=()=>openCompany(byId(b.dataset.cust)));
- mc.querySelectorAll('button[data-home]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.home);if(canControl(R)){R.order={type:'garrison',town:R.home};save();}openStrategy();});
- mc.querySelectorAll('button[data-hold]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.hold);if(canControl(R)){R.order={type:'hold'};save();}openStrategy();});
- mc.querySelectorAll('button[data-take]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.take);const S2=cmdScope();if(!S2||R.k!==S2.k||REGS.filter(r=>r.k===S2.k&&r.lead).length>=S2.max){toast('You already lead as many companies as your rank allows.');return;}R.lead=true;SEL=R;toast(`You take command of the ${R.name}.`,'gold');save();openStrategy();});
- mc.querySelectorAll('button[data-give]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.give);R.lead=false;if(R.order.type==='follow')R.order={type:'garrison',town:R.home};toast(`You hand the ${R.name} back to its colonel.`);save();openStrategy();});
+ mc.querySelectorAll('button[data-home]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.home);if(canControl(R)){R.order={type:'garrison',town:R.home};wOrd(R);save();}openStrategy();});
+ mc.querySelectorAll('button[data-hold]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.hold);if(canControl(R)){R.order={type:'hold'};wOrd(R);save();}openStrategy();});
+ mc.querySelectorAll('button[data-take]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.take);const S2=cmdScope();if(!S2||R.k!==S2.k||REGS.filter(r=>r.k===S2.k&&r.lead).length>=S2.max){toast('You already lead as many companies as your rank allows.');return;}R.lead=true;SEL=R;if(SHARED())wcmd('take',{id:R.id});toast(`You take command of the ${R.name}.`,'gold');save();openStrategy();});
+ mc.querySelectorAll('button[data-give]').forEach(b=>b.onclick=()=>{const R=byId(b.dataset.give);R.lead=false;if(SHARED())wcmd('give',{id:R.id});if(R.order.type==='follow')R.order={type:'garrison',town:R.home};toast(`You hand the ${R.name} back to its colonel.`);save();openStrategy();});
  if($('stRaise'))$('stRaise').onclick=()=>openEnlist(k);
- if($('stAuto'))$('stAuto').onclick=()=>{REGAUTO=!REGAUTO;openStrategy();};if($('stFort'))$('stFort').onclick=()=>{FORTMODE=!FORTMODE;openStrategy();};
+ if($('stAuto'))$('stAuto').onclick=()=>{REGAUTO=!REGAUTO;if(SHARED())wcmd('auto',{on:REGAUTO});openStrategy();};if($('stFort'))$('stFort').onclick=()=>{FORTMODE=!FORTMODE;openStrategy();};
  clearInterval(stratTimer);stratTimer=setInterval(()=>{if($('modal').classList.contains('hidden')||!$('stratMap')){clearInterval(stratTimer);return;}stratDraw($('stratMap'),k);},400);}
 // one company: name, division, formation, stance and quick orders
 function openCompany(R){if(!R||!canControl(R)){toast('You do not command that company.');return;}const ty=regTy(R),D=divOf(R);
@@ -5718,14 +5718,14 @@ function openCompany(R){if(!R||!canControl(R)){toast('You do not command that co
  <div class="sect">Stance</div><div class="row">${Object.entries(STANCES).map(([id,n])=>`<button class="btn ${R.stance===id?'on':''}" data-st="${id}">${n}</button>`).join('')}</div>
  <div class="sect">Orders</div><div class="row"><button class="btn primary" id="coFollow">Follow me</button><button class="btn" id="coHere">Hold here</button><button class="btn" id="coAtk">Attack the nearest enemy</button><button class="btn" id="coHome">March home</button><button class="btn" id="coBack">Back to the war map</button></div>`);
  const mc=$('mcontent');
- $('coRen').onclick=()=>{const v=$('coName').value.replace(/[<>]/g,'').trim().slice(0,40);if(v.length<3){toast('Give it a name of at least 3 letters.');return;}R.name=v;save();openCompany(R);};
- mc.querySelectorAll('button[data-div]').forEach(b=>b.onclick=()=>{R.div=b.dataset.div;if(R.sol){regDemat(R);}save();openCompany(R);});
- mc.querySelectorAll('button[data-form]').forEach(b=>b.onclick=()=>{R.form=b.dataset.form;save();openCompany(R);});
- mc.querySelectorAll('button[data-st]').forEach(b=>b.onclick=()=>{R.stance=b.dataset.st;save();openCompany(R);});
- $('coFollow').onclick=()=>{R.order={type:'follow'};toast(`The ${R.name} fall in behind you.`,'gold');save();closeModal();};
- $('coHere').onclick=()=>{R.order={type:'move',x:P.pos.x,z:P.pos.z};toast(`The ${R.name} march to where you stand.`,'gold');save();closeModal();};
- $('coAtk').onclick=()=>{let foe=null,fd=1e9;for(const O of REGS){if(!atWar(R.k,O.k))continue;const d=Math.hypot(O.x-R.x,O.z-R.z);if(d<fd){fd=d;foe=O;}}if(!foe){toast('There is no enemy in the field.');return;}R.order={type:'move',x:foe.x,z:foe.z};R.stance='attack';toast(`The ${R.name} march against the ${foe.name}.`,'gold');save();closeModal();};
- $('coHome').onclick=()=>{R.order={type:'garrison',town:R.home};save();closeModal();};$('coBack').onclick=()=>openStrategy();}
+ $('coRen').onclick=()=>{const v=$('coName').value.replace(/[<>]/g,'').trim().slice(0,40);if(v.length<3){toast('Give it a name of at least 3 letters.');return;}R.name=v;wCus(R,{name:v});save();openCompany(R);};
+ mc.querySelectorAll('button[data-div]').forEach(b=>b.onclick=()=>{R.div=b.dataset.div;wCus(R,{div:R.div});if(R.sol){regDemat(R);}save();openCompany(R);});
+ mc.querySelectorAll('button[data-form]').forEach(b=>b.onclick=()=>{R.form=b.dataset.form;wCus(R,{form:R.form});save();openCompany(R);});
+ mc.querySelectorAll('button[data-st]').forEach(b=>b.onclick=()=>{R.stance=b.dataset.st;wCus(R,{stance:R.stance});save();openCompany(R);});
+ $('coFollow').onclick=()=>{R.order={type:'follow'};wOrd(R);toast(`The ${R.name} fall in behind you.`,'gold');save();closeModal();};
+ $('coHere').onclick=()=>{R.order={type:'move',x:P.pos.x,z:P.pos.z};wOrd(R);toast(`The ${R.name} march to where you stand.`,'gold');save();closeModal();};
+ $('coAtk').onclick=()=>{let foe=null,fd=1e9;for(const O of REGS){if(!atWar(R.k,O.k))continue;const d=Math.hypot(O.x-R.x,O.z-R.z);if(d<fd){fd=d;foe=O;}}if(!foe){toast('There is no enemy in the field.');return;}R.order={type:'move',x:foe.x,z:foe.z};R.stance='attack';wOrd(R);wCus(R,{stance:'attack'});toast(`The ${R.name} march against the ${foe.name}.`,'gold');save();closeModal();};
+ $('coHome').onclick=()=>{R.order={type:'garrison',town:R.home};wOrd(R);save();closeModal();};$('coBack').onclick=()=>openStrategy();}
 // recruits fill the kingdom's reserves; the companies draw on them
 function openEnlist(k){const S=cmdScope();if(!S||!S.recruit){toast('Only Colonels, Generals and rulers can enlist soldiers.');return;}ENL.type=ENL.type||'foot';const ty=ENL.type;const room=kRoom(k,ty),tot=kSoldiers(k,ty);ENL.n=clamp(ENL.n||0,0,room);const per=UNITCOST[ty];const cost=ENL.n*per;const T=Math.round(GOV.treasury[k]);const ok=ENL.n>=1&&cost<=T;
  openModal(`<h2 class="ptitle" style="margin:0 0 4px">Enlist soldiers for ${K[k].name}</h2><p class="psub">In the field each kingdom keeps <b>3 infantry companies of 20</b>, <b>2 cavalry troops of 12</b> and <b>2 batteries of 2 guns</b> with 6 gunners. Recruits join the <b>reserves</b>, which replace the fallen and re-form broken companies. A kingdom can hold up to <b>${CAPS.foot} infantry</b>, <b>${CAPS.horse} cavalry</b> and <b>${CAPS.guns} gunners</b> in all.</p>
@@ -5739,7 +5739,7 @@ function openEnlist(k){const S=cmdScope();if(!S||!S.recruit){toast('Only Colonel
  mc.querySelectorAll('button[data-ty]').forEach(b=>b.onclick=()=>{ENL.type=b.dataset.ty;openEnlist(k);});
  $('enShip').onclick=()=>{if(commissionShip(k)){sfxChime();save();}else toast('No port can take a new warship right now.');openEnlist(k);};
  $('enBack').onclick=()=>openStrategy();
- $('enGo').onclick=()=>{GOV.treasury[k]-=cost;const R=newReg(k,capitalOf(k),ENL.n,ty);if(R)news(`${K[k].name} raises the ${R.name}.`);else toast(`${ENL.n} recruits join the ${UNITNAME[ty].toLowerCase()} reserves.`,'gold');sfxChime();save();openStrategy();};}
+ $('enGo').onclick=()=>{if(SHARED()){wcmd('enlist',{type:ty,n:ENL.n});toast('Your recruiting order goes out…');setTimeout(()=>openEnlist(k),700);return;}GOV.treasury[k]-=cost;const R=newReg(k,capitalOf(k),ENL.n,ty);if(R)news(`${K[k].name} raises the ${R.name}.`);else toast(`${ENL.n} recruits join the ${UNITNAME[ty].toLowerCase()} reserves.`,'gold');sfxChime();save();openStrategy();};}
 
 // ================= FIRE AND RUIN: houses catch, burn, collapse into blackened shells, and are rebuilt =================
 const FIREH=[];let _flameTex=null;const SMK=[];let smkI=0;
@@ -5853,6 +5853,56 @@ function updateHorse(dt){const show=P.riding&&P.items.horse&&!P.inside&&(P.mode=
   const bob=horseAnim(HORSE.userData.H,Math.min(mv,14),dt);HORSE.position.set(P.pos.x,groundAt(P.pos.x,P.pos.z),P.pos.z);HORSE.rotation.y=P.yaw;
   P.vis.g.position.y=HORSE.position.y+2.05+bob;P.vis.legs[0].rotation.x=P.vis.legs[1].rotation.x=-1.3;}}
  if(P.riding&&(P.mode==='swim'||P.inside)){P.riding=false;if(P.mode==='swim')toast('Your horse can’t swim. You slide off and it trots back to the stable.');}}
+
+// ================= THE SHARED REALM (online): the server runs politics, news and armies; this browser draws them =================
+const WNET={on:false,st:null,rt:0,seen:new Set()};
+function SHARED(){return WNET.on&&!!(window.AOC_HOOK&&window.AOC_HOOK.online);}
+function wcmd(op,o){if(window.AOC_NET&&window.AOC_NET.send)window.AOC_NET.send(Object.assign({t:'wcmd',op},o||{}));}
+const wOrd=R=>{if(SHARED()&&R)wcmd('order',{id:R.id,order:R.order});};
+const wCus=(R,o)=>{if(SHARED()&&R)wcmd('custom',Object.assign({id:R.id},o));};
+function wCopy4(dst,src){if(!src)return;for(let i=0;i<4;i++)for(let j=0;j<4;j++)if(typeof src[i][j]==='number')dst[i][j]=src[i][j];}
+function wApplyState(w){if(!w)return;const first=!WNET.on;WNET.on=true;WNET.st=w;
+ if(Math.abs(gameTime-w.t)>.01){gameTime=w.t;lastDay=Math.max(lastDay,Math.floor(gameTime));}
+ const warWas=WAR.map(r=>r.slice());wCopy4(REL,w.rel);wCopy4(WAR,w.war);wCopy4(ALLY,w.ally);wCopy4(WS,w.ws);
+ if(WAR.some((r,i)=>r.some((v,j)=>v!==warWas[i][j])))NPCS.forEach(n=>{if(!n.hostile())n.alert=false;});
+ for(let k=0;k<4;k++){const a=w.ai[k];if(a)Object.assign(AI[k],{pers:a.pers,mil:a.mil,stab:a.stab,goal:a.goal,grudge:a.grudge.slice(),trust:a.trust.slice()});
+  for(const f of['tax','treasury','appr','fest'])if(w.gov[f])GOV[f][k]=w.gov[f][k];for(const f of['pol','proj'])if(w.gov[f])GOV[f][k]=Object.assign({},w.gov[f][k]);
+  if(w.rulers&&w.rulers[k])K[k].ruler=w.rulers[k];if(w.res&&w.res[k])Object.assign(RES[k],w.res[k]);}
+ TREATIES.length=0;for(const q of w.treaties||[])TREATIES.push(Object.assign({},q));
+ NEWS.length=0;for(const n of w.news||[])NEWS.push({d:n.d,msg:n.msg});
+ for(const t of TOWNS){const o=w.occ[t.idx];const own=o===undefined?t.k:o;if((t.occ===undefined?t.k:t.occ)!==own&&!t.ceded)occupy(t,own,true);
+  const reb=(w.rebel||[]).includes(t.idx);if(reb&&!t.rebel)startRebellionQuiet(t);else if(!reb&&t.rebel){t.rebel=false;if(OCCFLAGS[t.idx]&&!(t.occ>=0)){scene.remove(OCCFLAGS[t.idx]);delete OCCFLAGS[t.idx];}}
+  const rv=w.ruin[t.idx]||0,was=t.ruin||0;if(Math.abs(rv-was)>.004||first){t.ruin=rv;if(rv>was+.02&&!first&&t.hs&&t.hs.length){const want=Math.round(rv*t.hs.length*.8);let have=t.hs.filter(h=>h.ruined||h.burn).length;const seed=t.hs.filter(h=>!h.ruined&&!h.burn).sort(()=>rr()-.5);while(have<want&&seed.length){fireIgnite(t,seed.pop());have++;}}ruinVisual(t);}}
+ for(const f of w.forts||[])if(!FORTS.some(o=>Math.abs(o.x-f.x)<1&&Math.abs(o.z-f.z)<1))buildFort(f.k,f.x,f.z,true);
+ const mk=P.army>=0?P.army:govK();if(w.auto)REGAUTO=!!w.auto[mk];
+ if(first){toast('📜 You have joined the shared realm. Wars, news and armies are the same for every player.','gold');}}
+function wNews(items){for(const n of items||[]){if(!NEWS.some(o=>o.msg===n.msg&&o.d===n.d))NEWS.unshift({d:n.d,msg:n.msg});if(NEWS.length>40)NEWS.pop();if(state==='play')toast('📜 '+n.msg,n.c==='bad'?'bad':'gold');}}
+function wWin(m){const R=myCompany();const mine=R&&R.id===m.id;addMerit(mine?4:2);toast(`${mine?'Your company':'Your army'} routs the ${m.foe}: +${m.gold||0} gold, +${mine?4:2} merit.`,'gold');}
+// companies: [id,k,type,name,str,mor,x,z,yaw,order,busy,rout,div,form,stance,leader,home,sieg,moving,cmd]
+function wApplyRegs(m){if(!WNET.on)return;const now=performance.now()/1000;const seen=new Set();
+ if(now-WNET.rt>5){WNET.rt=now;wApplyState(WNET.st);} // a save loaded after joining cannot pull this browser out of the shared realm
+
+ for(const v of m.regs){const[id,k,type,name,str,mor,x,z,yaw,order,busy,rout,div,form,stance,leader,home,sieg,moving,cmd]=v;seen.add(id);let R=REGS.find(r=>r.id===id);
+  if(!R){R={id,k,type,name,str,mor,x,z,yaw,home,order:{type:'hold'},div,form,stance,sieg:0,cmd:{name:'',rank:''}};REGS.push(R);}
+  if((R.div!==div||R.k!==k)&&R.sol)regDemat(R);
+  if(R.nt){const dt=Math.max(.3,now-R.nt);R.vx=(x-R.nx)/dt;R.vz=(z-R.nz)/dt;if(Math.hypot(R.vx,R.vz)>30)R.vx=R.vz=0;}else{R.vx=R.vz=0;}
+  if(Math.hypot(x-R.x,z-R.z)>200){R.x=x;R.z=z;if(R.sol)regDemat(R);}
+  Object.assign(R,{k,type,name,mor,nx:x,nz:z,nt:now,nyaw:yaw,order:order&&order.type==='follow'?{type:'tracking'}:order,busy:!!busy,rout:!!rout,div,form,stance,home,sieg,moving:!!moving,leadBy:leader,lead:!!leader&&leader===P.name});
+  const sp=(cmd||'').indexOf(' ');R.cmd=Object.assign(R.cmd||{},{rank:sp>0?cmd.slice(0,sp):'',name:sp>0?cmd.slice(sp+1):cmd});
+  if(R.sol){const diff=str-R.sol.length;if(diff<0){R.addT=0;for(let i=0;i<-diff;i++){const live=R.sol.filter(u=>!u.dead);if(!live.length)break;hurtNPC(live[Math.floor(rr()*live.length)],999,true);}R.str=str;}
+   else if(diff>0){R.addT=(R.addT||0)+1;if(R.addT>=2){R.addT=0;R.str=str;for(let i=0;i<diff;i++)regSpawn(R,R.sol.length,true);}}else{R.addT=0;R.str=str;}}
+  else R.str=str;}
+ for(let i=REGS.length-1;i>=0;i--){const R=REGS[i];if(seen.has(R.id))continue;regDemat(R);if(R.flag)scene.remove(R.flag);REGS.splice(i,1);}}
+// between server updates companies glide toward where the server says they are going
+function wRegsFrame(dt){for(const R of REGS){if(R.nx===undefined)continue;const age=Math.min(1.5,performance.now()/1000-(R.nt||0));const tx=R.nx+(R.vx||0)*age,tz=R.nz+(R.vz||0)*age;const f=Math.min(1,dt*3);R.x+=(tx-R.x)*f;R.z+=(tz-R.z)*f;if(!R.busy&&R.nyaw!==undefined)R.yaw=lerpA(R.yaw||0,R.nyaw,Math.min(1,dt*3));}}
+// the government panel: online, the crown's business goes to the server, which checks who you are
+function wGov(k,a,x,y){if(!SHARED())return false;const j=+x;const send=o=>{wcmd('gov',Object.assign({gk:k},o));toast('Your decision goes before the court…');setTimeout(()=>{if(!$('modal').classList.contains('hidden'))openGov();},700);return true;};
+ if(a==='tax-')return send({a:'tax',v:Math.max(0,GOV.tax[k]-5)});if(a==='tax+')return send({a:'tax',v:Math.min(40,GOV.tax[k]+5)});
+ if(a==='pol'||a==='proj')return send({a,id:x});if(['gift','insult','tribute','war','peace','ally','unally','sab'].includes(a))return send({a,k:j});
+ if(a==='recruit'||a==='fest')return send({a});
+ if(['take','give','dec','embargo','meet','woo','snap','armylvl','balloon'].includes(a)){toast('In the shared realm this is not available yet. Taxes, laws, great works, gifts, war, peace and alliances are.');return true;}
+ return false;}
+window.AOC_WORLD={state:wApplyState,regs:wApplyRegs,news:wNews,win:wWin,get on(){return SHARED();}};
 
 // ================= THE ASSEMBLY OF CROWNS: WINGS =================
 function backSpot(R0,x,z,yaw,key,lab){R0.arrive={x,z,yaw};R0.entry={x,z};R0.exit={x:x,z:z-9999};R0.spots.push({x,z:z+(yaw===PI?1.8:-1.8),label:lab||'Return to the Assembly chamber',type:'goroom',key:key||'assembly'});}
@@ -6550,7 +6600,7 @@ function openGov(tab){if(tab)GTAB=tab;const k=govAccess();if(k<0){toast('Only ru
   <div class="row" style="margin-bottom:10px">${tabs.map(t=>`<button class="btn ${GTAB===t[0]?'on':''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${body}
   ${P.admin?'<div class="tbtns"><button class="btn" data-a="court">Admin panel</button></div>':''}`);
  const mc=$('mcontent');mc.querySelectorAll('button[data-tab]').forEach(b=>b.onclick=()=>openGov(b.dataset.tab));
- mc.querySelectorAll('button[data-a]').forEach(b=>b.onclick=()=>{const[a,x,y]=b.dataset.a.split(':');const j=+x;
+ mc.querySelectorAll('button[data-a]').forEach(b=>b.onclick=()=>{const[a,x,y]=b.dataset.a.split(':');const j=+x;if(wGov(k,a,x,y))return;
   if(a==='tax-'){if(!parlVote(k,'taxdown',true,`lower taxes to ${Math.max(0,GOV.tax[k]-5)}%`,()=>{GOV.tax[k]=Math.max(0,GOV.tax[k]-5);}))return;}else if(a==='tax+'){if(!parlVote(k,'taxup',true,`raise taxes to ${Math.min(40,GOV.tax[k]+5)}%`,()=>{GOV.tax[k]=Math.min(40,GOV.tax[k]+5);}))return;}
   else if(a==='woo'){if(GOV.treasury[k]<300){toast('The treasury needs 300 gold.');return;}GOV.treasury[k]-=300;PARL[k].mood[x]=clamp(PARL[k].mood[x]+15,-100,100);toast(`Dinners, favours and promises: the ${PARTIES[x].n} warms to you.`,'gold');}else if(a==='snap'){PARL[k].next=d;parlDay();AI[k].stab=Math.max(5,AI[k].stab-3);}
   else if(a==='take'){GOV.treasury[k]-=500;P.gold+=500;sfxCoin();}else if(a==='give'){GOV.treasury[k]+=500;P.gold-=500;sfxCoin();}
@@ -6687,7 +6737,7 @@ function updateSky(dt,fx,fz){
  const glow=1-dayF;winMat.emissiveIntensity=glow*1.8;roomWin.color.setRGB(.12+.75*dayF,.14+.8*dayF,.25+.72*dayF);matMush.emissiveIntensity=.15+glow*1.4;matCrystal.emissiveIntensity=.2+glow*.9;
  lanternL.intensity=P.items.lumen&&glow>.3&&state==='play'?1.6*glow:0;lanternL.position.set(P.pos.x,P.pos.y+2.6,P.pos.z);
  for(const c of CLOUDS){c.material.color.setRGB(.25+.75*dayF,.25+.72*dayF,.32+.68*dayF);if(dusk>.1)c.material.color.lerp(_c2,dusk*.4);c.position.x+=dt*2.2;if(c.position.x>4900)c.position.x=-4900;}
- const day=Math.floor(gameTime);if(day>lastDay){lastDay=day;if(state==='play'){govDay();politicsDay();aiDay();meetingsDay();jobDay();dynastyDay();aiForts();parlDay();seasonDay();ruinDay();derbyDay();olyDay();checkStatues();fangDay();if(P.ruler>=0){P.gold+=150;toast('Morning. The royal treasury sends you 150 gold.','gold');}else if(P.army>=0){const w=6+P.rank*6;P.gold+=w;toast(`Morning. Your army wages arrive: ${w} gold.`,'gold');}}}
+ const day=Math.floor(gameTime);if(day>lastDay){lastDay=day;if(state==='play'){if(!SHARED()){govDay();politicsDay();aiDay();meetingsDay();dynastyDay();aiForts();parlDay();ruinDay();fangDay();}jobDay();seasonDay();derbyDay();olyDay();checkStatues();if(P.ruler>=0){P.gold+=150;toast('Morning. The royal treasury sends you 150 gold.','gold');}else if(P.army>=0){const w=6+P.rank*6;P.gold+=w;toast(`Morning. Your army wages arrive: ${w} gold.`,'gold');}}}
 }
 
 // ================= AMBIENT =================

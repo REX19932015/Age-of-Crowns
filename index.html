@@ -1601,16 +1601,45 @@ function mouseUnitGeo(u,coat,trim,pants){
  g=new THREE.BufferGeometry();g.setAttribute('position',b.pos);g.setAttribute('normal',b.nor);g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('skinIndex',b.ski);g.setAttribute('skinWeight',b.skw);g.setIndex(b.idx);g.computeBoundingSphere();
  _muGeo.set(key,g);return g;}
 let _msBase=null;const _msGeo=new Map(),_msAll={};
-function mouseSkinGeo(fur,slim){const vk=slim&&window.MORPHS&&window.MORPHS.slimbody?'slim':'std';_msBase=_msAll[vk]||null;   // one seamless fur body for every mouse, recoloured per fur: colour = A·fur + B
+
+// ================= MARKINGS ON THE FUR =================
+const SM_=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
+const SPOTS_=[[.18,1.05,.3],[-.2,.85,.31],[-.05,1.25,-.33],[.24,.7,-.28],[-.27,1.15,-.2],[.12,1.9,-.25],[-.3,1.72,.05],[.3,.98,.1],[-.12,.62,.25],[.05,2.02,.15]];
+function markW(k,x,y,z,bn){
+ if(k==='belly'){if(bn===0)return SM_(.06,.16,z)*SM_(.5,.62,y)*(1-SM_(1.3,1.4,y));if(bn===1)return SM_(.1,.2,z)*(1-SM_(1.52,1.62,y));return 0;}
+ if(k==='mask'){if(bn!==1)return 0;return SM_(.08,.16,z)*SM_(1.52,1.58,y)*(1-SM_(1.76,1.82,y))*(1-SM_(.36,.44,Math.abs(x)));}
+ if(k==='snout'){if(bn!==1)return 0;return SM_(.3,.42,z)*(1-SM_(1.86,1.94,y));}
+ if(k==='socks'){if(bn===4||bn===5)return 1-SM_(.2,.32,y);if(bn===2||bn===3)return 1-SM_(.82,.95,y);return 0;}
+ if(k==='stripe'){if(bn!==0&&bn!==1&&bn!==6)return 0;if(bn===6)return 1;return SM_(-.02,-.14,z)*(1-SM_(.05,.11,Math.abs(x)));}
+ if(k==='cap'){if(bn!==1)return 0;return SM_(1.77,1.83,y)*(1-SM_(.3,.36,Math.abs(x)));}
+ if(k==='spots'){if(bn===6)return 0;let w=0;for(const c of SPOTS_){const d=Math.hypot(x-c[0],y-c[1],z-c[2]);w=Math.max(w,1-SM_(.07,.11,d));}return w;}
+ return 0;}
+
+
+// ================= FACIAL HAIR =================
+function mouseTache(v,t,fur){
+ const l=LC(fur),lum=.3*l.r+.6*l.g+.1*l.b,c=lum<.08?mixHex(fur,'#d8cfc2',.45):shadeHex(fur,.5),cD=shadeHex(c,.75);
+ if(t==='handlebar')for(const s of[-1,1]){v.add(GB.sph,c,TM(s*.075,-.085,.52,.085,.03,.04,0,-s*.35,s*.12),cD);v.add(GB.sph,c,TM(s*.16,-.06,.47,.05,.022,.03,0,-s*.75,-s*.5),cD);v.add(GB.sphs,c,TM(s*.19,-.02,.44,.02));}
+ if(t==='walrus')for(const s of[-1,1])v.add(GB.sph,c,TM(s*.065,-.12,.57,.1,.075,.07,0,0,s*.3),cD);
+ if(t==='goatee'){v.add(GB.cone8,c,TM(0,-.27,.38,.055,.13,.05,PI+.35,0,0),cD);v.add(GB.sph,c,TM(0,-.2,.43,.05,.04,.035),cD);}
+ if(t==='chops')for(const s of[-1,1])v.add(GB.sph,c,TM(s*.27,-.06,.2,.07,.13,.07,0,0,-s*.2),cD);
+}
+
+function mouseSkinGeo(fur,slim,o){o=o||{};const vk=slim&&window.MORPHS&&window.MORPHS.slimbody?'slim':'std';_msBase=_msAll[vk]||null;   // one seamless fur body for every mouse, recoloured per fur: colour = A·fur + B
  if(!_msBase){const D=vk==='slim'?window.MORPHS.slimbody:MOUSE_SDF,dec=(s,T)=>{const b=Uint8Array.from(atob(s),c=>c.charCodeAt(0));return new T(b.buffer);};
   const p=dec(D.pos,Int16Array),n=dec(D.nor,Int8Array),A=dec(D.A,Uint8Array),B=dec(D.B,Uint8Array),si=dec(D.si,Uint8Array),sw=dec(D.sw,Uint8Array),N=D.v;
   const pos=new Float32Array(N*3),nor=new Float32Array(N*3),Bl=new Float32Array(N*3),Af=new Float32Array(N),ski=new Uint16Array(N*4),skw=new Float32Array(N*4);
   for(let i=0;i<N;i++){for(let c=0;c<3;c++){pos[i*3+c]=p[i*3+c]/1e4;nor[i*3+c]=n[i*3+c]/127;Bl[i*3+c]=Math.pow(B[i*3+c]/255,2.2);}Af[i]=A[i]/255;ski[i*4]=si[i*2];ski[i*4+1]=si[i*2+1];skw[i*4]=sw[i]/255;skw[i*4+1]=1-sw[i]/255;}
-  _msBase=_msAll[vk]={N,Af,Bl,pos:new THREE.BufferAttribute(pos,3),nor:new THREE.BufferAttribute(nor,3),ski:new THREE.Uint16BufferAttribute(ski,4),skw:new THREE.BufferAttribute(skw,4),idx:new THREE.Uint16BufferAttribute(dec(D.idx,Uint16Array),1)};}
- let g=_msGeo.get(vk+fur);if(g)return g;const b=_msBase,f=LC(fur),col=new Float32Array(b.N*3);
- for(let i=0;i<b.N;i++){col[i*3]=b.Af[i]*f.r+b.Bl[i*3];col[i*3+1]=b.Af[i]*f.g+b.Bl[i*3+1];col[i*3+2]=b.Af[i]*f.b+b.Bl[i*3+2];}
+  const bn=new Uint8Array(N);for(let i=0;i<N;i++)bn[i]=si[i*2];
+  _msBase=_msAll[vk]={N,Af,Bl,bn,pos:new THREE.BufferAttribute(pos,3),nor:new THREE.BufferAttribute(nor,3),ski:new THREE.Uint16BufferAttribute(ski,4),skw:new THREE.BufferAttribute(skw,4),idx:new THREE.Uint16BufferAttribute(dec(D.idx,Uint16Array),1)};}
+ const gk=vk+fur+'|'+(o.skin||'')+'|'+(o.mark||'')+'|'+(o.mark2||'');let g=_msGeo.get(gk);if(g)return g;const b=_msBase,f=LC(fur),col=new Float32Array(b.N*3);
+ const sk=o.skin?LC(o.skin):null,pk=LC('#e3a3a7'),tr=sk?[sk.r/pk.r,sk.g/pk.g,sk.b/pk.b]:[1,1,1];
+ const m2=o.mark?LC(o.mark2||'#f3ede2'):null,P_=b.pos.array;
+ for(let i=0;i<b.N;i++){let fr=f.r,fg=f.g,fb=f.b;
+  if(m2){const w=markW(o.mark,P_[i*3],P_[i*3+1],P_[i*3+2],b.bn[i]);if(w>0){fr+=(m2.r-fr)*w;fg+=(m2.g-fg)*w;fb+=(m2.b-fb)*w;}}
+  col[i*3]=b.Af[i]*fr+b.Bl[i*3]*tr[0];col[i*3+1]=b.Af[i]*fg+b.Bl[i*3+1]*tr[1];col[i*3+2]=b.Af[i]*fb+b.Bl[i*3+2]*tr[2];}
  g=new THREE.BufferGeometry();g.setAttribute('position',b.pos);g.setAttribute('normal',b.nor);g.setAttribute('color',new THREE.BufferAttribute(col,3));g.setAttribute('skinIndex',b.ski);g.setAttribute('skinWeight',b.skw);g.setIndex(b.idx);g.computeBoundingSphere();
- _msGeo.set(vk+fur,g);return g;}
+ _msGeo.set(gk,g);return g;}
 const EYEMAT=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.06,metalness:.1});
 const mgeo=new Map();function partGeo(key,fn){let g=mgeo.get(key);if(!g){const v=new VB();fn(v);g=v.geometry();mgeo.set(key,g);}return g;}
 function pm(geo,mat){const m=new THREE.Mesh(geo,mat||MOUSEMAT);m.castShadow=true;return m;}
@@ -1680,15 +1709,17 @@ function makeMouse(o){
   rankPins(v,rkOf(o));
  })));
  const head=new THREE.Bone();head.position.set(0,1.62,0);body.add(head);
- const kH=['H3',U,fur,o.hat,o.hatCol,coat,trim,o.officer,o.corps,o.glasses,o.feather,o.earring].join('|');
+ const kH=['H3',U,fur,o.hat,o.hatCol,coat,trim,o.officer,o.corps,o.glasses,o.feather,o.earring,o.wh,o.tache].join('|');
  head.add(pm(partGeo(kH,v=>{
   // the head, snout, nose, teeth and ears are one seamless surface (see mouseSkinGeo); whiskers and hats are added here
   for(const s of[-1,1]){const em=TM(s*.24,.28,-.08,1,1,1,-.2,s*.45,-s*.5);
   // long fine whiskers in two segments, plus brow whiskers
    if(U==='ironmask'||U==='sniper')continue;   // a closed helm or a ghillie hood hides the whiskers
    if(o.hat==='ironmask'){v.add(GB.torus,'#2c2d2a',em.clone().multiply(TM(0,-.27,0,.11,.11,.16,PI/2,0,0)));continue;}   // the helm hides the whiskers; a ring seals each ear
-   for(let k=0;k<6;k++){const yy=-.06+(k%3-1)*.022,zz=.5-Math.floor(k/3)*.035;const ry=-s*(.05+k*.07),rz=s*((k%3)-1)*.14;v.add(GB.boxc,'#f4f0e8',TM(s*.2,yy,zz-.06,.34,.0045,.0045,0,ry,rz));v.add(GB.boxc,'#e6e0d4',TM(s*.42,yy+((k%3)-1)*.02,zz-.17,.2,.0035,.0035,0,ry*1.6,rz*1.4));}
+   if(o.wh==='none')continue;const wl=o.wh==='short'?.55:o.wh==='long'?1.4:1;
+   for(let k=0;k<6;k++){const yy=-.06+(k%3-1)*.022,zz=.5-Math.floor(k/3)*.035;const ry=-s*(.05+k*.07),rz=s*((k%3)-1)*.14;v.add(GB.boxc,'#f4f0e8',TM(s*(.03+.17*wl),yy,zz-.06*wl,.34*wl,.0045,.0045,0,ry,rz));if(wl>.6)v.add(GB.boxc,'#e6e0d4',TM(s*(.03+.39*wl),yy+((k%3)-1)*.02*wl,zz-.17*wl,.2*wl,.0035,.0035,0,ry*1.6,rz*1.4));}
    v.add(GB.boxc,'#efe9df',TM(s*.17,.16,.22,.2,.0035,.0035,0,-s*.4,s*.35));}
+  if(o.tache&&U!=='ironmask'&&U!=='sniper')mouseTache(v,o.tache,fur);
   const hc=o.hatCol||'#1d1712',gold='#e2b84a';
   if(!UH)switch(o.hat){
    case 'tricorn':v.add(GB.cyl3,hc,TM(0,.2,-.02,.47,.12,.47,0,PI,0));if(o.officer)v.add(GB.cyl3,gold,TM(0,.2,-.02,.5,.025,.5,0,PI,0));v.add(GB.sph,hc,TM(0,.3,-.02,.23,.15,.23));break;
@@ -1710,19 +1741,21 @@ function makeMouse(o){
   if(o.glasses==='round'||o.glasses==='dark'){const gc=o.glasses==='dark'?'#151515':'#c9a24a';for(const s of[-1,1]){v.add(GB.torus,gc,TM(s*.165,.075,.33,.105,.105,.06,0,0,0));if(o.glasses==='dark')v.add(GB.cylc,'#101010',TM(s*.165,.075,.33,.09,.01,.09,PI/2,0,0));}v.add(GB.boxc,gc,TM(0,.09,.34,.12,.015,.015));}
   if(o.glasses==='mono'){v.add(GB.torus,'#c9a24a',TM(.165,.075,.335,.11,.11,.06));v.add(GB.boxc,'#c9a24a',TM(.24,-.12,.3,.008,.36,.008,0,0,.3));}
  })));
- head.add(pm(partGeo('E4',v=>{for(const s of[-1,1]){v.add(GB.sphm,'#050303',TM(s*.165,.075,.245,.09,.095,.082));v.add(GB.sphs,'#ffffff',TM(s*.165+s*.012+.022,.114,.318,.021));v.add(GB.sphs,'#ffffff',TM(s*.165-.02,.05,.312,.009));}}),EYEMAT));
+ head.add(pm(partGeo('E4'+(o.eye||''),v=>{for(const s of[-1,1]){v.add(GB.sphm,o.eye?shadeHex(o.eye,.75):'#050303',TM(s*.165,.075,.245,.09,.095,.082));if(o.eye)v.add(GB.sphm,'#050303',TM(s*.165,.075,.27,.052,.056,.062));v.add(GB.sphs,'#ffffff',TM(s*.165+s*.012+.022,.114,.318,.021));v.add(GB.sphs,'#ffffff',TM(s*.165-.02,.05,.312,.009));}}),EYEMAT));
  const arms=[];for(const s of[-1,1]){const a=new THREE.Bone();a.position.set(s*.38,1.33,0);body.add(a);
 arms.push(a);}
  const legs=[];for(const s of[-1,1]){const l=new THREE.Bone();l.position.set(s*.17,.62,0);g.add(l);
 legs.push(l);}
+ if(o.boots)legs.forEach(l=>l.add(pm(partGeo('BT'+o.boots,v=>{const c=o.boots,cD=shadeHex(c,.7);v.add(GB.cyl,c,TM(0,-.42,.01,.165,.28,.165),cD);v.add(GB.cyl,shadeHex(c,.8),TM(0,-.15,.01,.18,.04,.18));v.add(GB.sph,c,TM(0,-.585,.11,.16,.075,.25),cD);v.add(GB.boxc,'#1d1712',TM(0,-.655,.1,.3,.02,.46));}))));
  const tail=new THREE.Bone();tail.position.set(0,.74,-.34);body.add(tail);
  // the seamless fur body (head, snout, ears, hands, feet and tail), skinned to the parts above so it moves with them
- const skin_=new THREE.SkinnedMesh(mouseSkinGeo(fur,!!U&&SLEEKU.has(U)),MOUSEMAT_SK);skin_.castShadow=true;g.add(skin_);
+ const skin_=new THREE.SkinnedMesh(mouseSkinGeo(fur,!!U&&SLEEKU.has(U),o),MOUSEMAT_SK);skin_.castShadow=true;g.add(skin_);
  const cloth_=U?new THREE.SkinnedMesh(mouseUnitGeo(U,coat,trim,pants),MOUSEMAT_SK):null;if(cloth_){cloth_.castShadow=true;g.add(cloth_);}g.updateMatrixWorld(true);
  const skel_=new THREE.Skeleton([body,head,arms[0],arms[1],legs[0],legs[1],tail]);skin_.bind(skel_);if(cloth_)cloth_.bind(skel_);
  const vis={g,body,head,arms,legs,tail,musket:null,aimed:false,t:rr()*10,muzzleY:1.5};
  if(o.musket){const gty=o.gun||'musket';const gf=o.gunfin;const m=pm(partGeo('M_'+gty+(gf?'_'+gf.wood+gf.metal+gf.brass:''),v=>gunVB(gf?finVB(v,gf):v,gty)));vis.muzzleY=GUNMUZ[gty];
   const mg=new THREE.Group();mg.add(m);body.add(mg);vis.musket=mg;}
+ if(o.tail&&+o.tail!==1)tail.scale.setScalar(Math.max(.5,Math.min(1.6,+o.tail)));
  setAim(vis,false);return vis;}
 function setAim(v,on){v.aimed=on;if(!v.musket)return;const m=v.musket;if(on){m.position.set(.16,1.24,.05);m.rotation.set(PI/2,0,0);}else{m.position.set(.12,.55,-.44);m.rotation.set(0,0,.55);}}
 function animMouse(v,spd,dt,mode){
@@ -2588,6 +2621,7 @@ function outfit(){
  else if(dress==='army'){const k=K[P.army],cp=corpsNow();o={fur:P.fur,coat:k.coat,trim:k.trim,hat:CORPS[cp].hat,corps:cp,musket:true,pants:shadeHex(k.coat,.72),epaulettes:false,officer:P.rank>=OFFICER_R,rk:String(P.rank)};}
  else o=civ;
  if(worn('cuirass')&&dress!=='royal')o.cuirass=true;if(Lk.glasses)o.glasses=Lk.glasses;if(Lk.earring)o.earring=Lk.earring;if(dress!=='civ'&&Lk.scarf)o.scarf=Lk.scarf;if(worn('helmet')&&dress==='civ')o.hat='helmet';
+ for(const k_ of['eye','skin','mark','mark2','wh','tache','tail'])if(Lk[k_]!==undefined&&Lk[k_]!=='')o[k_]=Lk[k_];if(dress==='civ'&&Lk.boots)o.boots=Lk.boots;
  if(o.musket&&typeof curWeapon==='function')o.gun=curWeapon().id;if(window.AOC_HOOK&&window.AOC_HOOK.cosLook)try{o=window.AOC_HOOK.cosLook(o,dress)||o;}catch(e){}P.vis=makeMouse(o);P.visO=o;if(window.AOC_HOOK&&window.AOC_HOOK.outfit)try{window.AOC_HOOK.outfit(o);}catch(e){}P.vis.g.scale.setScalar(Lk.size||1);scene.add(P.vis.g);P.vis.g.position.copy(P.pos);buildVM(o.coat,o.trim);}
 function dressNow(){const L0=P.look;let d=L0.dress||'auto';if(L0.royal===false&&d==='auto')d=P.armyChosen?'army':'civ';if(L0.civvies&&d==='auto')d='civ';
  if(d==='royal'&&P.ruler<0)d='auto';if(d==='army'&&P.army<0)d='auto';if(d==='gov'&&P.gov.k<0&&P.ruler<0)d='auto';
@@ -6446,9 +6480,17 @@ function openWardrobe(){const L0=P.look;const sw=(arr,key,lab)=>`<div style="mar
  ${sw(['#1d1712','#4a3320','#c9a35a','#2f4f7a','#7a2420','#2e6b3a','#efe9df','#6a3a7a'],'hatCol','Hat colour')}
  ${sw(['','#6b1e2e','#1f2433','#2e5a3a','#5a3a6a','#c9b48a','#2a2a2e','#efe9df'],'cape','Cloak (first: none)')}${sw(['','#c0303a','#2f5f8a','#e2b84a','#2e6b3a','#6a3a7a','#efe9df'],'sash','Sash (first: none)')}${sw(['','#c0303a','#2f5f8a','#e2b84a','#efe9df','#2a2a2e','#5a7a3a','#d88aa0'],'scarf','Scarf (first: none)')}${sw(['','#ffffff','#c0303a','#2f5f8a','#e2b84a','#2a2a2e','#4ac07a'],'feather','Hat feather (first: none)')}
  <div class="psub" style="margin:4px 0 4px">Accessories</div><div class="row">${[['glasses','','No spectacles'],['glasses','round','Round spectacles'],['glasses','dark','Dark glasses'],['glasses','mono','Monocle']].map(q=>`<button class="btn ${(L0[q[0]]||'')===q[1]?'on':''}" data-k="${q[0]}" data-v="${q[1]}">${q[2]}</button>`).join('')}</div><div class="row">${[['earring','','No earring'],['earring','gold','Gold earring'],['earring','silver','Silver earring'],['bag','','No satchel'],['bag','#6a4a2a','Leather satchel'],['bag','#4a5a3a','Canvas satchel'],['apron','','No apron'],['apron','1','Apron']].map(q=>`<button class="btn ${String(L0[q[0]]||'')===q[1]||(q[0]==='apron'&&!!L0.apron===!!q[1])?'on':''}" data-k="${q[0]}" data-v="${q[1]}">${q[2]}</button>`).join('')}</div>
+
+ <div class="psub" style="margin:10px 0 2px;font-weight:700">Your mouse</div><p class="psub" style="margin:0 0 4px">These show in every outfit, uniforms included.</p>
+ ${sw(['','#5a3a1e','#8a6a2a','#2f6fd6','#2e8a4a','#b8862a','#b8303a','#7a7f8a'],'eye','Eyes (first: black)')}${sw(['','#d98a9a','#f0c0b8','#9a8f8f','#7a5a4a','#3a3030'],'skin','Nose, ears and paws (first: pink)')}
+ <div class="psub" style="margin:4px 0 4px">Markings</div><div class="row">${[['','None'],['belly','Pale belly'],['snout','Pale snout'],['mask','Bandit mask'],['socks','Socks'],['cap','Dark cap'],['stripe','Back stripe'],['spots','Spots']].map(q=>`<button class="btn ${(L0.mark||'')===q[0]?'on':''}" data-k="mark" data-v="${q[0]}">${q[1]}</button>`).join('')}</div>
+ ${L0.mark?sw(['#f3ede2','#ffffff','#e6d6bb','#b37c46','#6a5a50','#4c3d35','#2a2424','#9a9aa0'],'mark2','Marking colour'):''}
+ <div class="psub" style="margin:4px 0 4px">Whiskers and facial hair</div><div class="row">${[['wh','none','No whiskers'],['wh','short','Short whiskers'],['wh','','Whiskers'],['wh','long','Long whiskers']].map(q=>`<button class="btn ${(L0[q[0]]||'')===q[1]?'on':''}" data-k="${q[0]}" data-v="${q[1]}">${q[2]}</button>`).join('')}</div><div class="row">${[['tache','','Clean shaven'],['tache','handlebar','Handlebar moustache'],['tache','walrus','Walrus moustache'],['tache','goatee','Goatee'],['tache','chops','Mutton chops']].map(q=>`<button class="btn ${(L0[q[0]]||'')===q[1]?'on':''}" data-k="${q[0]}" data-v="${q[1]}">${q[2]}</button>`).join('')}</div>
+ <div class="psub" style="margin:4px 0 4px">Tail</div><div class="row">${[[.6,'Stub'],[.8,'Short'],[1,'Normal'],[1.2,'Long'],[1.4,'Very long']].map(q=>`<button class="btn ${(L0.tail||1)===q[0]?'on':''}" data-k="tail" data-v="${q[0]}">${q[1]}</button>`).join('')}</div>
+ ${sw(['','#1d1712','#4a3320','#8a6a3a','#c9a35a','#6b1e2e','#2a3a5a'],'boots','Boots (first: bare paws; worn with your own clothes)')}
  <div class="psub" style="margin:4px 0 4px">Size</div><div class="row">${[[.85,'Small'],[.93,'Short'],[1,'Medium'],[1.07,'Tall'],[1.14,'Very tall']].map(q=>`<button class="btn ${L0.size===q[0]?'on':''}" data-k="size" data-v="${q[0]}">${q[1]}</button>`).join('')}</div>
  ${dressRow()}${['jerkin','cuirass','helmet'].some(a=>P.items[a])?`<div class="psub" style="margin:8px 0 4px">Armour</div><div class="row">${[['jerkin','Leather jerkin'],['cuirass','Steel breastplate'],['helmet','Steel helmet']].filter(a=>P.items[a[0]]).map(a=>`<button class="btn ${worn(a[0])?'on':''}" data-arm="${a[0]}">${worn(a[0])?'Wearing':'Not wearing'}: ${a[1]}</button>`).join('')}</div><p class="psub" style="margin:0 0 6px">Armour you take off stays in your pack. Damage reduction now: ${Math.round(armourCut()*100)}%.</p>`:''}`);wireDress(openWardrobe);$('mcontent').querySelectorAll('button[data-arm]').forEach(b=>b.onclick=()=>{P.armOff=P.armOff||{};const a=b.dataset.arm;P.armOff[a]=!P.armOff[a];outfit();save();openWardrobe();});
- $('mcontent').querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;let v=b.dataset.v;if(k==='size')v=+v;if(k==='apron')v=!!v;if(v===''&&k!=='hat')v=undefined;if(k==='civvies')v=!L0.civvies;L0[k]=v;if(k==='fur')P.fur=v;outfit();save();openWardrobe();});}
+ $('mcontent').querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;let v=b.dataset.v;if(k==='size'||k==='tail')v=+v;if(k==='apron')v=!!v;if(v===''&&k!=='hat')v=undefined;if(k==='civvies')v=!L0.civvies;L0[k]=v;if(k==='fur')P.fur=v;outfit();save();openWardrobe();});}
 
 // ================= POLITICS, DIPLOMACY AND BATTLES =================
 const REL=[[100,10,-70,0],[10,100,0,-70],[-70,0,100,10],[0,-70,10,100]];const ALLY=[[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]];
